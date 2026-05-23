@@ -14,6 +14,7 @@ htmlcov/
 
 # 虚拟环境
 .venv/
+.venv-test/
 venv/
 env/
 
@@ -39,7 +40,10 @@ backups/
 recordings/
 outputs/
 inbox/
-models/
+# 注意：用 /models/ 锚定到仓库根，只忽略模型缓存目录；
+# 不能写成 models/，否则会连 ORM 源码包 app/models/ 一起忽略（曾导致该包未入库、应用无法启动）。
+/models/
+!app/models/
 
 # 大型模型缓存
 *.bin
