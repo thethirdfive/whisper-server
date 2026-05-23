@@ -79,7 +79,14 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "B", "UP", "C4", "SIM", "ARG"]
-ignore = ["E501"]
+# B008: FastAPI 依赖注入惯用 Depends() 作默认值，非缺陷
+ignore = ["E501", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+# 路由里的 request / 鉴权用 user 等依赖参数即便函数体不直接使用也必须保留
+"app/api/*" = ["ARG001"]
+"app/main.py" = ["ARG001"]
+"app/auth/*" = ["ARG001"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

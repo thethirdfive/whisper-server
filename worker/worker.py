@@ -7,7 +7,7 @@ import sys
 
 import structlog
 from redis import Redis
-from rq import Connection, Queue, Worker
+from rq import Queue, Worker
 
 from app.config import get_settings
 
@@ -50,13 +50,14 @@ def main() -> None:
         log.error("redis_unreachable", error=str(e))
         sys.exit(1)
 
-    # 监听这些队列（FIFO 优先级）
-    queues = ["transcription", "drive_sync", "default"]
+    # 监听这些队列（FIFO 优先级）。RQ 2.x 已移除 Connection 上下文，
+    # 改为给 Queue/Worker 直接传 connection。
+    queue_names = ["transcription", "drive_sync", "default"]
+    queues = [Queue(q, connection=redis_conn) for q in queue_names]
 
-    with Connection(redis_conn):
-        worker = Worker([Queue(q) for q in queues])
-        log.info("worker_ready", queues=queues)
-        worker.work(with_scheduler=False)
+    worker = Worker(queues, connection=redis_conn)
+    log.info("worker_ready", queues=queue_names)
+    worker.work(with_scheduler=False)
 
 
 if __name__ == "__main__":

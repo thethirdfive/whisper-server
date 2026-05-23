@@ -1,5 +1,5 @@
 """服务端 session - 用 itsdangerous 签名 cookie 携带 user_id"""
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from fastapi import Cookie, Depends, HTTPException, Request, status
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
