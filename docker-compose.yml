@@ -1,3 +1,20 @@
+# ============================================================================
+# 双盘分层存储:
+#   HOST_DATA_DIR (NVMe, 速度敏感) → db / models / outputs
+#   HOST_BULK_DIR (HDD,  大文件)   → recordings / inbox / backups
+# 部署前先跑: bash scripts/setup-storage.sh
+# ============================================================================
+
+x-whisper-volumes: &whisper-volumes
+  # NVMe (速度敏感)
+  - ${HOST_DATA_DIR:-/data/whisper}/db:/data/whisper/db
+  - ${HOST_DATA_DIR:-/data/whisper}/models:/data/whisper/models
+  - ${HOST_DATA_DIR:-/data/whisper}/outputs:/data/whisper/outputs
+  # HDD (大文件)
+  - ${HOST_BULK_DIR:-/mnt/data/whisper}/recordings:/data/whisper/recordings
+  - ${HOST_BULK_DIR:-/mnt/data/whisper}/inbox:/data/whisper/inbox
+  - ${HOST_BULK_DIR:-/mnt/data/whisper}/backups:/data/whisper/backups
+
 services:
   app:
     build:
@@ -9,8 +26,7 @@ services:
     ports:
       - "127.0.0.1:18080:8000"   # 只绑本地，公网通过 frpc → VPS NPM
     env_file: .env
-    volumes:
-      - ${HOST_DATA_DIR:-/data/whisper}:/data/whisper
+    volumes: *whisper-volumes
     depends_on:
       redis:
         condition: service_healthy
@@ -34,11 +50,10 @@ services:
     environment:
       # PyTorch 显存优化
       - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-      # 模型缓存目录（持久化到 host volume）
+      # 模型缓存目录（持久化到 NVMe volume）
       - HF_HOME=/data/whisper/models/hf
       - TORCH_HOME=/data/whisper/models/torch
-    volumes:
-      - ${HOST_DATA_DIR:-/data/whisper}:/data/whisper
+    volumes: *whisper-volumes
     depends_on:
       redis:
         condition: service_healthy
@@ -75,8 +90,7 @@ services:
     container_name: whisper-backup
     restart: unless-stopped
     env_file: .env
-    volumes:
-      - ${HOST_DATA_DIR:-/data/whisper}:/data/whisper
+    volumes: *whisper-volumes
     networks:
       - whisper-net
 
