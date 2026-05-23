@@ -111,7 +111,7 @@ whisper-server/
 - 项目骨架与目录结构
 - docker-compose.yml + 三个 Dockerfile
 - .env.example 含所有可配置项
-- 14 张表的 SQLAlchemy ORM 模型
+- 15 张表的 SQLAlchemy ORM 模型（`app/models/`）
 - Alembic 初始化 + 001 建表迁移 + 002 词库 seed 加载
 - 首次启动自动创建管理员（基于 .env 的 ADMIN_*）
 - FastAPI app 主程序 + 配置 + DB session
@@ -120,12 +120,25 @@ whisper-server/
 - 登录页 + 占位的首页
 - 每日 SQLite 备份脚本
 
+### ✅ 已完成 (Day 6-7)
+
+- 词库管理 UI：列表 / 详情 / 词条增删改、自定义词库（预置词库受保护）
+- 上传向导：多文件、场景选择、自定义提示词，保存到 HDD recordings 并入队
+- 会议列表 / 详情页（含转录文本、说话人、initial_prompt 预览）
+- WhisperX 转录 worker（`worker/jobs/process_meeting.py`）：
+  ffprobe → 视频抽轨 → 16k 合并 → 场景词库拼 prompt → 转录 + 对齐 + 说话人分离 → 入库
+  （代码完成并通过编排测试；首次实跑会下载 large-v3 等模型）
+- htmx 状态轮询（转录完成自动刷新展示结果）
+- 未登录访问 HTML 页自动跳登录页
+- 修复：`.gitignore` 的 `models/` 误伤 ORM 包；`.env` bcrypt 含 `$` 被 compose
+  env_file 插值损坏；`BACKUP_CRON_SCHEDULE` 未加引号致 `source .env` 报错；
+  RQ 2.x 移除 `Connection`；Starlette 新版 `TemplateResponse` 签名
+
 ### 🚧 进行中 / 下一步
 
-- [ ] REST API 路由（meetings / scenarios / vocabularies / settings / search）
-- [ ] Web UI 完整页面（会议列表 / 详情 / 上传向导 / 词库管理 / 设置）
-- [ ] WhisperX 转录 worker（视频抽轨 → 合并 → 转录）
-- [ ] WebSocket 进度推送
+- [ ] 场景管理 / 设置页 UI
+- [ ] 全文搜索（FTS5；注意 unicode61 不切分中文，需 trigram/CJK tokenizer）
+- [ ] 说话人重命名、Word/产物导出
 - [ ] MCP server (Phase 3)
 - [ ] Google Drive 集成 (Phase 2)
 - [ ] 双语 i18n 完整翻译

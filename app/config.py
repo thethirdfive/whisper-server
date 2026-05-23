@@ -1,8 +1,6 @@
 """Pydantic Settings - 集中管理所有环境变量"""
-from pathlib import Path
 from typing import Literal
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -71,7 +69,10 @@ class Settings(BaseSettings):
     log_format: Literal["json", "text"] = "json"
 
     # === 数据目录 ===
-    host_data_dir: str = "/data/whisper"
+    host_data_dir: str = "/data/whisper"      # host NVMe（bind mount 源）
+    host_bulk_dir: str = "/mnt/data/whisper"  # host HDD（bind mount 源）
+    # 容器内数据根（bind mount 后固定为 /data/whisper；测试时可指向临时目录）
+    data_root: str = "/data/whisper"
 
     @property
     def allowed_audio_set(self) -> set[str]:

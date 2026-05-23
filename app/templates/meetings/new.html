@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}上传会议 - whisper-server{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto space-y-6">
+    <div>
+        <a href="/meetings" class="text-sm text-slate-500 hover:text-slate-900">← 返回会议列表</a>
+        <h1 class="text-2xl font-bold mt-2">上传会议 / New Meeting</h1>
+        <p class="text-sm text-slate-500 mt-1">上传一个或多个音频/视频文件，系统会自动抽音轨、合并并转录。</p>
+    </div>
+
+    {% if error %}
+    <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/meetings" enctype="multipart/form-data" class="space-y-5 bg-white rounded-lg border border-slate-200 p-6">
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">标题 / Title *</label>
+            <input name="title" required class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" />
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">场景 / Scenario</label>
+                <select name="scenario_id" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white">
+                    <option value="">（无场景，不注入词库）</option>
+                    {% for s in scenarios %}
+                    <option value="{{ s.id }}">{{ s.name_zh }} / {{ s.name_en }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-slate-400 mt-1">场景关联的词库会自动注入转录提示。</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">语言 / Language</label>
+                <select name="language" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white">
+                    <option value="zh">中文 zh</option>
+                    <option value="en">English en</option>
+                    <option value="auto">自动检测 auto</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">公司 / Company</label>
+                <input name="company" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">会议时间 / Held at</label>
+                <input type="datetime-local" name="held_at" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" />
+                <p class="text-xs text-slate-400 mt-1">留空 = 现在</p>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">标签 / Tags</label>
+            <input name="tags" placeholder="逗号分隔，如：客户,Q2,复盘" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" />
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">额外提示词 / Custom prompt</label>
+            <textarea name="custom_prompt" rows="2" placeholder="可选：补充人名、专有名词等，追加到词库提示之后"
+                      class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"></textarea>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">文件 / Files *</label>
+            <input type="file" name="files" multiple required
+                   class="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            <p class="text-xs text-slate-400 mt-1">
+                多选 = 按顺序合并为一场会议。单文件上限 / 合计上限 {{ max_size_mb }}MB。<br>
+                音频：{{ allowed_audio|join(", ") }}<br>
+                视频：{{ allowed_video|join(", ") }}
+            </p>
+        </div>
+
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md text-sm">
+                上传并开始转录
+            </button>
+            <a href="/meetings" class="text-sm text-slate-500 hover:text-slate-900">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

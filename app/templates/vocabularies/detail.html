@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}{{ vocab.name_zh }} - 词库 - whisper-server{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <a href="/vocabularies" class="text-sm text-slate-500 hover:text-slate-900">← 返回词库列表</a>
+
+    {% if msg %}
+    <div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded">{{ msg }}</div>
+    {% endif %}
+    {% if error %}
+    <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">{{ error }}</div>
+    {% endif %}
+
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <div class="flex items-start justify-between">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="text-2xl font-bold">{{ vocab.name_zh }}</h1>
+                    {% if vocab.builtin %}
+                    <span class="text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded">预置</span>
+                    {% endif %}
+                </div>
+                <p class="text-sm text-slate-500">{{ vocab.name_en }} · <span class="font-mono">{{ vocab.code }}</span>
+                    {% if vocab.industry %} · {{ vocab.industry }}{% endif %}
+                </p>
+                {% if vocab.description_zh %}<p class="text-sm text-slate-600 mt-2">{{ vocab.description_zh }}</p>{% endif %}
+            </div>
+            {% if user.role == "admin" and not vocab.builtin %}
+            <form method="post" action="/vocabularies/{{ vocab.id }}/delete"
+                  onsubmit="return confirm('确认删除该词库及其所有词条？')">
+                <button class="text-sm text-slate-400 hover:text-red-600">删除词库</button>
+            </form>
+            {% endif %}
+        </div>
+
+        {% if user.role == "admin" %}
+        <details class="mt-4">
+            <summary class="cursor-pointer text-sm text-blue-600">编辑词库信息</summary>
+            <form method="post" action="/vocabularies/{{ vocab.id }}" class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <label>中文名<input name="name_zh" value="{{ vocab.name_zh }}" required class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" /></label>
+                <label>English name<input name="name_en" value="{{ vocab.name_en }}" required class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" /></label>
+                <label>行业<input name="industry" value="{{ vocab.industry or '' }}" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" /></label>
+                <label>中文描述<input name="description_zh" value="{{ vocab.description_zh or '' }}" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" /></label>
+                <label class="md:col-span-2">英文描述<input name="description_en" value="{{ vocab.description_en or '' }}" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" /></label>
+                <div class="md:col-span-2"><button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">保存</button></div>
+            </form>
+        </details>
+        {% endif %}
+    </div>
+
+    <!-- 词条 -->
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <h2 class="font-semibold mb-4">词条 / Terms（{{ terms|length }}）</h2>
+
+        {% if user.role == "admin" %}
+        <form method="post" action="/vocabularies/{{ vocab.id }}/terms"
+              class="grid grid-cols-1 md:grid-cols-6 gap-2 text-sm mb-5 items-end">
+            <input name="term_zh" placeholder="中文术语" class="px-3 py-2 border border-slate-300 rounded-md" />
+            <input name="term_en" placeholder="English term" class="px-3 py-2 border border-slate-300 rounded-md" />
+            <input name="pinyin" placeholder="拼音(可选)" class="px-3 py-2 border border-slate-300 rounded-md" />
+            <input name="aliases" placeholder="别名(逗号分隔)" class="px-3 py-2 border border-slate-300 rounded-md" />
+            <input name="note" placeholder="备注" class="px-3 py-2 border border-slate-300 rounded-md" />
+            <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">+ 添加</button>
+        </form>
+        {% endif %}
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left text-slate-400 border-b border-slate-200">
+                        <th class="py-2 pr-3">中文</th>
+                        <th class="py-2 pr-3">English</th>
+                        <th class="py-2 pr-3">拼音</th>
+                        <th class="py-2 pr-3">别名</th>
+                        <th class="py-2 pr-3">备注</th>
+                        {% if user.role == "admin" %}<th class="py-2">操作</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in terms %}
+                    <tr class="border-b border-slate-100 align-top">
+                        <td class="py-2 pr-3">{{ t.term_zh or "—" }}</td>
+                        <td class="py-2 pr-3">{{ t.term_en or "—" }}</td>
+                        <td class="py-2 pr-3 text-slate-400">{{ t.pinyin or "—" }}</td>
+                        <td class="py-2 pr-3 text-slate-400">{{ t.aliases or "—" }}</td>
+                        <td class="py-2 pr-3 text-slate-400">{{ t.note or "—" }}</td>
+                        {% if user.role == "admin" %}
+                        <td class="py-2 whitespace-nowrap">
+                            <details class="inline">
+                                <summary class="cursor-pointer text-blue-600">编辑</summary>
+                                <form method="post" action="/vocabularies/{{ vocab.id }}/terms/{{ t.id }}"
+                                      class="mt-2 grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded">
+                                    <input name="term_zh" value="{{ t.term_zh or '' }}" placeholder="中文" class="px-2 py-1 border border-slate-300 rounded" />
+                                    <input name="term_en" value="{{ t.term_en or '' }}" placeholder="English" class="px-2 py-1 border border-slate-300 rounded" />
+                                    <input name="pinyin" value="{{ t.pinyin or '' }}" placeholder="拼音" class="px-2 py-1 border border-slate-300 rounded" />
+                                    <input name="aliases" value="{{ t.aliases or '' }}" placeholder="别名" class="px-2 py-1 border border-slate-300 rounded" />
+                                    <input name="note" value="{{ t.note or '' }}" placeholder="备注" class="px-2 py-1 border border-slate-300 rounded col-span-2" />
+                                    <button class="bg-blue-600 text-white px-3 py-1 rounded col-span-2">保存修改</button>
+                                </form>
+                            </details>
+                            <form method="post" action="/vocabularies/{{ vocab.id }}/terms/{{ t.id }}/delete"
+                                  class="inline" onsubmit="return confirm('删除该词条？')">
+                                <button class="text-slate-400 hover:text-red-600 ml-2">删除</button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="py-4 text-slate-400">暂无词条。</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

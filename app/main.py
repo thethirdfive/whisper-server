@@ -3,24 +3,26 @@ from datetime import datetime
 from pathlib import Path
 
 import structlog
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, Form, Request, Response, status
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
+from app.api import meetings, vocabularies
 from app.auth import (
     SESSION_COOKIE_NAME,
     create_session_cookie,
     get_current_user,
-    require_login,
     verify_password,
 )
 from app.config import get_settings
 from app.database import engine, get_db
 from app.models import Scenario, User, Vocabulary, VocabularyTerm
+from app.templating import templates
 
 # ============================================================================
 # 启动配置
@@ -42,12 +44,19 @@ app = FastAPI(
 # ============================================================================
 
 BASE_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
+# 业务路由
+app.include_router(meetings.router)
+app.include_router(vocabularies.router)
 
-# 模板全局变量注入（让所有模板能访问这些）
-templates.env.globals["app_version"] = __version__
+
+@app.exception_handler(StarletteHTTPException)
+async def _auth_aware_http_exception(request: Request, exc: StarletteHTTPException):
+    """未登录访问 HTML 页面时重定向到登录页，而不是抛 401 JSON。"""
+    if exc.status_code == status.HTTP_401_UNAUTHORIZED:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    return await http_exception_handler(request, exc)
 
 
 # ============================================================================
@@ -91,9 +100,9 @@ def root(
     term_count = db.scalar(select(func.count()).select_from(VocabularyTerm))
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         {
-            "request": request,
             "user": user,
             "settings": settings,
             "scenario_count": scenario_count,
@@ -116,9 +125,9 @@ def login_page(
     if user:
         return RedirectResponse(url="/", status_code=status.HTTP_302_FOUND)
     return templates.TemplateResponse(
+        request,
         "auth/login.html",
         {
-            "request": request,
             "settings": settings,
             "error": error,
         },

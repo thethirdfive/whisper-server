@@ -1,0 +1,23 @@
+{% set status_styles = {
+    "uploaded": "bg-slate-100 text-slate-600",
+    "queued": "bg-amber-50 text-amber-700",
+    "processing": "bg-blue-50 text-blue-700",
+    "transcribed": "bg-green-50 text-green-700",
+    "failed": "bg-red-50 text-red-700",
+} %}
+<div id="job-status"
+     {% if meeting.status in ["queued", "processing"] %}
+     hx-get="/meetings/{{ meeting.id }}/status"
+     hx-trigger="every 3s"
+     hx-swap="outerHTML"
+     {% endif %}>
+    <div class="flex items-center gap-3">
+        <span class="text-xs px-2 py-0.5 rounded {{ status_styles.get(meeting.status, 'bg-slate-100 text-slate-600') }}">{{ meeting.status }}</span>
+        {% if job and meeting.status in ["queued", "processing"] %}
+        <span class="text-sm text-slate-500">{{ job.progress }}%{% if job.message %} · {{ job.message }}{% endif %}</span>
+        {% endif %}
+    </div>
+    {% if meeting.status == "failed" and job and job.error %}
+    <pre class="mt-2 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded whitespace-pre-wrap">{{ job.error }}</pre>
+    {% endif %}
+</div>

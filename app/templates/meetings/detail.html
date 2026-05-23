@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ meeting.title }} - 会议 - whisper-server{% endblock %}
+
+{% macro mmss(sec) %}{{ "%02d:%02d"|format((sec|int)//60, (sec|int)%60) }}{% endmacro %}
+
+{% block content %}
+<div class="space-y-6">
+    <a href="/meetings" class="text-sm text-slate-500 hover:text-slate-900">← 返回会议列表</a>
+
+    {% if msg %}
+    <div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded">{{ msg }}</div>
+    {% endif %}
+    {% if error %}
+    <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">{{ error }}</div>
+    {% endif %}
+
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <h1 class="text-2xl font-bold">{{ meeting.title }}</h1>
+                <p class="text-sm text-slate-500 mt-1">
+                    {{ meeting.scenario.name_zh if meeting.scenario else "无场景" }}
+                    {% if meeting.company %} · {{ meeting.company }}{% endif %}
+                    · {{ meeting.held_at.strftime("%Y-%m-%d %H:%M") if meeting.held_at else "" }}
+                    · {{ meeting.language }}
+                </p>
+                {% if meeting.tags %}<p class="text-xs text-slate-400 mt-1">🏷 {{ meeting.tags }}</p>{% endif %}
+            </div>
+            {% include "meetings/_status.html" %}
+        </div>
+
+        {% if prompt_preview %}
+        <details class="mt-4">
+            <summary class="cursor-pointer text-sm text-blue-600">查看转录提示词 initial_prompt</summary>
+            <pre class="mt-2 p-3 bg-slate-50 border border-slate-200 text-xs rounded whitespace-pre-wrap">{{ prompt_preview }}</pre>
+        </details>
+        {% endif %}
+    </div>
+
+    <!-- 文件 -->
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <h2 class="font-semibold mb-3">文件 / Files（{{ files|length }}）</h2>
+        <ul class="divide-y divide-slate-100 text-sm">
+            {% for f in files %}
+            <li class="py-2 flex items-center justify-between">
+                <span>
+                    <span class="text-slate-400 mr-2">{{ "%02d"|format(f.sequence) }}</span>
+                    {{ f.original_name }}
+                    <span class="text-xs ml-2 px-1.5 py-0.5 rounded {{ 'bg-purple-50 text-purple-700' if f.media_kind == 'video' else 'bg-slate-100 text-slate-500' }}">{{ f.media_kind }}</span>
+                </span>
+                <span class="text-slate-400 text-xs">
+                    {% if f.size_bytes %}{{ (f.size_bytes / 1048576)|round(1) }} MB{% endif %}
+                </span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <!-- 转录文本 -->
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <h2 class="font-semibold mb-3">转录 / Transcript</h2>
+        {% if segments %}
+        <div class="space-y-3">
+            {% for s in segments %}
+            {% set sp = speakers.get(s.speaker_id) %}
+            <div class="flex gap-3 text-sm">
+                <span class="text-xs text-slate-400 font-mono whitespace-nowrap pt-0.5">{{ mmss(s.start_sec) }}</span>
+                <div>
+                    {% if sp %}<span class="font-medium text-slate-700">{{ sp.display_name or sp.label }}</span>{% endif %}
+                    <span class="text-slate-800">{{ s.text }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif meeting.status in ["queued", "processing"] %}
+        <p class="text-sm text-slate-400">转录进行中，完成后自动显示。</p>
+        {% elif meeting.status == "failed" %}
+        <p class="text-sm text-red-500">转录失败，详见上方错误信息。</p>
+        {% else %}
+        <p class="text-sm text-slate-400">尚无转录内容。</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

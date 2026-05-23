@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}会议 / Meetings - whisper-server{% endblock %}
+
+{% set status_styles = {
+    "uploaded": "bg-slate-100 text-slate-600",
+    "queued": "bg-amber-50 text-amber-700",
+    "processing": "bg-blue-50 text-blue-700",
+    "transcribed": "bg-green-50 text-green-700",
+    "failed": "bg-red-50 text-red-700",
+} %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold">会议 / Meetings</h1>
+        <a href="/meetings/new"
+           class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-md">
+            + 上传会议
+        </a>
+    </div>
+
+    {% if msg %}
+    <div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded">{{ msg }}</div>
+    {% endif %}
+    {% if error %}
+    <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">{{ error }}</div>
+    {% endif %}
+
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead>
+                <tr class="text-left text-slate-400 border-b border-slate-200">
+                    <th class="py-3 px-4">标题</th>
+                    <th class="py-3 px-4">场景</th>
+                    <th class="py-3 px-4">公司</th>
+                    <th class="py-3 px-4">时间</th>
+                    <th class="py-3 px-4">状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in meetings %}
+                <tr class="border-b border-slate-100 hover:bg-slate-50">
+                    <td class="py-3 px-4"><a href="/meetings/{{ m.id }}" class="text-blue-600 hover:underline">{{ m.title }}</a></td>
+                    <td class="py-3 px-4 text-slate-500">{{ m.scenario.name_zh if m.scenario else "—" }}</td>
+                    <td class="py-3 px-4 text-slate-500">{{ m.company or "—" }}</td>
+                    <td class="py-3 px-4 text-slate-500">{{ m.held_at.strftime("%Y-%m-%d %H:%M") if m.held_at else "—" }}</td>
+                    <td class="py-3 px-4">
+                        <span class="text-xs px-2 py-0.5 rounded {{ status_styles.get(m.status, 'bg-slate-100 text-slate-600') }}">{{ m.status }}</span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="5" class="py-8 px-4 text-center text-slate-400">还没有会议，点右上角「上传会议」开始。</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

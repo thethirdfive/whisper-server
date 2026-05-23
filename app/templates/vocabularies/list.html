@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}词库 / Vocabularies - whisper-server{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="text-2xl font-bold">词库 / Vocabularies</h1>
+            <p class="text-sm text-slate-500 mt-1">
+                领域术语会在转录前注入 Whisper 的 initial_prompt，提升中英混杂识别准确率。
+            </p>
+        </div>
+    </div>
+
+    {% if msg %}
+    <div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded">{{ msg }}</div>
+    {% endif %}
+    {% if error %}
+    <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">{{ error }}</div>
+    {% endif %}
+
+    {% if user.role == "admin" %}
+    <details class="bg-white rounded-lg border border-slate-200 p-4">
+        <summary class="cursor-pointer text-sm font-medium text-blue-600">+ 新建自定义词库</summary>
+        <form method="post" action="/vocabularies" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <label class="block">代码 code（唯一，英文）
+                <input name="code" required class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" />
+            </label>
+            <label class="block">行业 industry（可选）
+                <input name="industry" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" />
+            </label>
+            <label class="block">中文名
+                <input name="name_zh" required class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" />
+            </label>
+            <label class="block">English name
+                <input name="name_en" required class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" />
+            </label>
+            <label class="block md:col-span-2">中文描述
+                <input name="description_zh" class="mt-1 w-full px-3 py-2 border border-slate-300 rounded-md" />
+            </label>
+            <div class="md:col-span-2">
+                <button class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md">创建</button>
+            </div>
+        </form>
+    </details>
+    {% endif %}
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {% for v in vocabs %}
+        <a href="/vocabularies/{{ v.id }}"
+           class="block bg-white rounded-lg shadow-sm border border-slate-200 p-5 hover:border-blue-400 transition-colors">
+            <div class="flex items-start justify-between">
+                <div class="font-semibold">{{ v.name_zh }}</div>
+                {% if v.builtin %}
+                <span class="text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded">预置</span>
+                {% else %}
+                <span class="text-xs px-2 py-0.5 bg-blue-50 text-blue-600 rounded">自定义</span>
+                {% endif %}
+            </div>
+            <div class="text-sm text-slate-500">{{ v.name_en }}</div>
+            <div class="mt-3 flex items-center justify-between text-xs text-slate-400">
+                <span>{{ v.industry or "—" }}</span>
+                <span>{{ counts.get(v.id, 0) }} 词条</span>
+            </div>
+        </a>
+        {% else %}
+        <p class="text-slate-400 text-sm">暂无词库。</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
