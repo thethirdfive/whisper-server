@@ -1,0 +1,53 @@
+# whisper-server worker 镜像
+# 跑 WhisperX + ffmpeg + GPU，镜像较大（~6GB 含 PyTorch + CUDA）
+
+FROM pytorch/pytorch:2.5.1-cuda12.1-cudnn9-runtime AS base
+
+# 系统依赖：ffmpeg 是关键
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        git \
+        curl \
+        ca-certificates \
+        sqlite3 \
+        libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# 用 uv 管理
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml ./
+
+# 安装 worker 依赖（含 whisperx + 应用层）
+RUN uv pip install --system --no-cache \
+        "fastapi[all]>=0.115.0" \
+        "sqlalchemy>=2.0.35" \
+        "alembic>=1.13.0" \
+        "bcrypt>=4.2.0" \
+        "pydantic>=2.9.0" \
+        "pydantic-settings>=2.5.0" \
+        "rq>=1.16.0" \
+        "redis>=5.1.0" \
+        "httpx>=0.27.0" \
+        "structlog>=24.4.0" \
+        "tenacity>=9.0.0" \
+        "ffmpeg-python>=0.2.0" \
+        "google-api-python-client>=2.149.0" \
+        "google-auth-httplib2>=0.2.0" \
+        "google-auth-oauthlib>=1.2.0" \
+        "whisperx>=3.4.0"
+
+COPY app/ /app/app/
+COPY worker/ /app/worker/
+COPY migrations/ /app/migrations/
+COPY scripts/ /app/scripts/
+COPY alembic.ini /app/
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONPATH=/app
+
+# RQ worker 入口
+CMD ["python", "-m", "worker.worker"]

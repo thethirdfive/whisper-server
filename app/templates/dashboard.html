@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - whisper-server{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold">欢迎回来，{{ user.display_name }}</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            Welcome back, {{ user.display_name }}.
+            上次登录 / Last login:
+            {{ user.last_login_at.strftime("%Y-%m-%d %H:%M") if user.last_login_at else "首次登录" }}
+        </p>
+    </div>
+
+    <!-- 统计卡 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <div class="text-3xl">🏷</div>
+            <div class="text-2xl font-bold mt-2">{{ scenario_count }}</div>
+            <div class="text-sm text-slate-500">场景 / Scenarios</div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <div class="text-3xl">📚</div>
+            <div class="text-2xl font-bold mt-2">{{ vocab_count }}</div>
+            <div class="text-sm text-slate-500">词库 / Vocabularies</div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <div class="text-3xl">📝</div>
+            <div class="text-2xl font-bold mt-2">{{ term_count }}</div>
+            <div class="text-sm text-slate-500">术语词条 / Terms</div>
+        </div>
+    </div>
+
+    <!-- 系统状态 -->
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <h2 class="font-semibold mb-4">系统状态 / System</h2>
+        <dl class="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+            <dt class="text-slate-500">环境</dt>
+            <dd class="font-mono">{{ settings.app_env }}</dd>
+            <dt class="text-slate-500">公网地址</dt>
+            <dd class="font-mono">{{ settings.app_public_url }}</dd>
+            <dt class="text-slate-500">Whisper 模型</dt>
+            <dd class="font-mono">{{ settings.whisper_model }}</dd>
+            <dt class="text-slate-500">说话人分离</dt>
+            <dd class="font-mono">{{ settings.diarize_model }}</dd>
+            <dt class="text-slate-500">GPU 模式</dt>
+            <dd class="font-mono">{{ settings.whisper_device }}</dd>
+        </dl>
+    </div>
+
+    <!-- 开发进度提示 -->
+    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm">
+        <strong>🚧 这是 Phase 1 MVP 骨架</strong>
+        — 上传会议、转录、词库管理等功能正在补完，详见 README.md 的"开发进度"章节。
+    </div>
+</div>
+{% endblock %}

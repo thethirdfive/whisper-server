@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# 依赖锁文件（uv 用 uv.lock）
+# 锁文件保留以便复现
+# uv.lock
+
+# 环境变量与密钥
+.env
+.env.local
+.env.*.local
+
+# 数据库与备份
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/
+backups/
+
+# 上传与处理产物
+recordings/
+outputs/
+inbox/
+models/
+
+# 大型模型缓存
+*.bin
+*.safetensors
+*.gguf
+
+# Google Drive 凭据
+gdrive_creds.json
+service_account.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Docker
+.docker/
+
+# Alembic（保留 versions，忽略其他临时）
+# 无
+
+# i18n 编译产物
+*.mo
+
+# 日志
+*.log
+logs/
+
+# 测试
+.coverage
+htmlcov/
+test_results/

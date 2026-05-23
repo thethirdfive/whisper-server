@@ -1,0 +1,90 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.app
+    image: whisper-server-app:latest
+    container_name: whisper-app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18080:8000"   # 只绑本地，公网通过 frpc → VPS NPM
+    env_file: .env
+    volumes:
+      - ${HOST_DATA_DIR:-/data/whisper}:/data/whisper
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - whisper-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.worker
+    image: whisper-server-worker:latest
+    container_name: whisper-worker
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # PyTorch 显存优化
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      # 模型缓存目录（持久化到 host volume）
+      - HF_HOME=/data/whisper/models/hf
+      - TORCH_HOME=/data/whisper/models/torch
+    volumes:
+      - ${HOST_DATA_DIR:-/data/whisper}:/data/whisper
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - whisper-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  redis:
+    image: redis:7-alpine
+    container_name: whisper-redis
+    restart: unless-stopped
+    networks:
+      - whisper-net
+    volumes:
+      - redis-data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  backup-cron:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backup
+    image: whisper-server-backup:latest
+    container_name: whisper-backup
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ${HOST_DATA_DIR:-/data/whisper}:/data/whisper
+    networks:
+      - whisper-net
+
+volumes:
+  redis-data:
+    name: whisper-redis-data
+
+networks:
+  whisper-net:
+    name: whisper-net
+    driver: bridge

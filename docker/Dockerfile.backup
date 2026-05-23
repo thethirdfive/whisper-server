@@ -1,0 +1,17 @@
+# whisper-server 备份容器
+# 每日 cron 跑 sqlite3 .backup + gzip
+
+FROM alpine:3.19
+
+RUN apk add --no-cache \
+        sqlite \
+        gzip \
+        curl \
+        bash \
+        coreutils
+
+COPY scripts/backup.sh /backup.sh
+RUN chmod +x /backup.sh
+
+# 默认每天 03:00；可被 .env 的 BACKUP_CRON_SCHEDULE 覆盖
+CMD ["sh", "-c", "echo \"${BACKUP_CRON_SCHEDULE:-0 3 * * *} /backup.sh >> /var/log/cron.log 2>&1\" | crontab - && crond -f -l 2"]

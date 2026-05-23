@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}whisper-server{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+    {% if user %}
+    <header class="bg-white border-b border-slate-200">
+        <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-14 items-center">
+                <div class="flex items-center space-x-6">
+                    <a href="/" class="font-bold text-lg">🎙 whisper-server</a>
+                    <a href="/meetings" class="text-sm text-slate-600 hover:text-slate-900">会议 / Meetings</a>
+                    <a href="/scenarios" class="text-sm text-slate-600 hover:text-slate-900">场景 / Scenarios</a>
+                    <a href="/vocabularies" class="text-sm text-slate-600 hover:text-slate-900">词库 / Vocabularies</a>
+                    <a href="/settings" class="text-sm text-slate-600 hover:text-slate-900">设置 / Settings</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-sm text-slate-500">{{ user.display_name }} ({{ user.role }})</span>
+                    <form method="post" action="/logout">
+                        <button class="text-sm text-slate-500 hover:text-red-600">登出</button>
+                    </form>
+                </div>
+            </div>
+        </nav>
+    </header>
+    {% endif %}
+
+    <main class="{% if user %}max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="text-center text-xs text-slate-400 py-6">
+        whisper-server v{{ settings.app_public_url }}
+    </footer>
+</body>
+</html>
