@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}场景 / Scenarios - whisper-server{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <div>
+        <h1 class="text-2xl font-bold">场景 / Scenarios</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            上传会议时选择场景，系统会自动把它关联的词库注入转录提示词（initial_prompt）。
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {% for s in scenarios %}
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-5">
+            <div class="flex items-start justify-between">
+                <div class="font-semibold">{{ s.icon or "🏷" }} {{ s.name_zh }}</div>
+                {% if s.builtin %}
+                <span class="text-xs px-2 py-0.5 bg-slate-100 text-slate-500 rounded">预置</span>
+                {% endif %}
+            </div>
+            <div class="text-sm text-slate-500">{{ s.name_en }} · <span class="font-mono">{{ s.code }}</span></div>
+            {% if s.description_zh %}<p class="text-sm text-slate-600 mt-2">{{ s.description_zh }}</p>{% endif %}
+            <div class="mt-3">
+                <div class="text-xs text-slate-400 mb-1">关联词库 / Vocabularies（{{ s.vocabularies|length }}）</div>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for v in s.vocabularies %}
+                    <a href="/vocabularies/{{ v.id }}"
+                       class="text-xs px-2 py-0.5 bg-blue-50 text-blue-700 rounded hover:bg-blue-100">{{ v.name_zh }}</a>
+                    {% else %}
+                    <span class="text-xs text-slate-400">无关联词库</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-slate-400 text-sm">暂无场景。</p>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

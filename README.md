@@ -125,6 +125,7 @@ whisper-server/
 - 词库管理 UI：列表 / 详情 / 词条增删改、自定义词库（预置词库受保护）
 - 上传向导：多文件、场景选择、自定义提示词，保存到 HDD recordings 并入队
 - 会议列表 / 详情页（含转录文本、说话人、initial_prompt 预览）
+- 场景浏览页（含关联词库）、设置 / 系统信息页（只读）
 - WhisperX 转录 worker（`worker/jobs/process_meeting.py`）：
   ffprobe → 视频抽轨 → 16k 合并 → 场景词库拼 prompt → 转录 + 对齐 + 说话人分离 → 入库
   （代码完成并通过编排测试；首次实跑会下载 large-v3 等模型）
@@ -136,7 +137,7 @@ whisper-server/
 
 ### 🚧 进行中 / 下一步
 
-- [ ] 场景管理 / 设置页 UI
+- [ ] 场景↔词库关联在线编辑、设置项在线修改（当前为只读展示）
 - [ ] 全文搜索（FTS5；注意 unicode61 不切分中文，需 trigram/CJK tokenizer）
 - [ ] 说话人重命名、Word/产物导出
 - [ ] MCP server (Phase 3)

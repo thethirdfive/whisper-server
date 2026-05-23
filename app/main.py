@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
-from app.api import meetings, vocabularies
+from app.api import meetings, scenarios, vocabularies
+from app.api import settings as settings_routes
 from app.auth import (
     SESSION_COOKIE_NAME,
     create_session_cookie,
@@ -48,6 +49,8 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 
 # 业务路由
 app.include_router(meetings.router)
+app.include_router(scenarios.router)
+app.include_router(settings_routes.router)
 app.include_router(vocabularies.router)
 
 
