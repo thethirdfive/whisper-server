@@ -134,8 +134,15 @@ def login_page(
     )
 
 
+def _cookie_secure(request: Request) -> bool:
+    """HTTPS 时用 Secure cookie；局域网 HTTP 访问时不加 Secure，否则浏览器不会保存会话。"""
+    proto = request.headers.get("x-forwarded-proto", "").split(",")[0].strip()
+    return proto == "https" if proto else request.url.scheme == "https"
+
+
 @app.post("/login")
 def login_submit(
+    request: Request,
     response: Response,
     username: str = Form(...),
     password: str = Form(...),
@@ -162,7 +169,7 @@ def login_submit(
         max_age=settings.session_lifetime_days * 86400,
         httponly=True,
         samesite="lax",
-        secure=(settings.app_env == "production"),
+        secure=_cookie_secure(request),
     )
     log.info("login_success", username=username, user_id=user.id)
     return resp
