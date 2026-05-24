@@ -1,12 +1,12 @@
 # 转录后整理（方案一：Claude Code + MCP）
 
-录音转写完成后，把会议整理成一份**HTML 报告**。整理由你服务器上的 **Claude Code** 经 **MCP**
+录音转写完成后，把会议整理成一份 **HTML 报告**。整理由你服务器上的 **Claude Code** 经 **MCP**
 驱动——走 Max 订阅，几乎零额外费用。
 
 ## 架构
 
 ```
-Whisper 系统  ──(MCP, stdio)──  Claude Code (本机, 定时跑)
+Whisper(app 容器)  ──MCP(stdio, docker exec)──  Claude Code (本机, 定时跑)
    │  list_pending_reports()   待整理队列(report_status=queued)
    │  get_meeting(id)          元数据 + 场景整理模板 + 转录全文
    │  claim_report(id)         标记 processing
@@ -14,20 +14,24 @@ Whisper 系统  ──(MCP, stdio)──  Claude Code (本机, 定时跑)
    └  report_failed(id, err)
 ```
 
-- MCP server：`mcp_server/server.py`，stdio 直连系统同一个 SQLite（`/data/whisper/db/whisper.db`）。
-- 报告产出：HTML 存到 `/data/whisper/outputs/{meeting_id}/`，并在会议详情页「整理报告」区可查看/下载。
-- 通知：生成后发 Bark（需在设置/`.env` 配 `BARK_KEY`，没配则跳过）。
+- **MCP server 跑在 app 容器内**（`mcp_server/server.py`，已打进 app 镜像）。
+  Claude Code 用 `docker compose exec -T app python -m mcp_server.server` 以 stdio 连进去。
+  > 为什么在容器内：SQLite 库文件是容器以 root 写的；本机用户直接连会"readonly database"。
+  > 在容器内跑，库/输出目录/代理/依赖都和 app 一致。
+- 报告产出：HTML 存到 `/data/whisper/outputs/{meeting_id}/`，会议详情页「整理报告」区可查看 /
+  导出 PDF（weasyprint）/ 下载 HTML。
+- 通知：生成后发 Bark（设置/`.env` 配 `BARK_KEY`，没配则跳过）。
 - 模板：每个场景一套（场景页「整理模板」可编辑），没配就用内置默认。
 
 ## 一次性准备
 
-1. 建 MCP 专用 venv（已含 app 依赖 + mcp）：
+1. 确保 app 容器在跑（`docker compose ps`）——MCP server 已打进镜像，无需额外安装。
+2. 仓库根已有 `.mcp.json`（指向 `docker compose exec`）。在仓库目录启动 Claude Code：
    ```bash
-   cd /home/ai/whisper-server
-   uv venv .venv-mcp && VIRTUAL_ENV=.venv-mcp uv pip install -e ".[mcp]"
+   cd /home/ai/whisper-server && claude
    ```
-2. 仓库根已有 `.mcp.json`，Claude Code 在本目录启动时会自动发现 `whisper` 这个 MCP server。
-   验证：在本目录跑 `claude`，输入 `/mcp` 应能看到 `whisper` 已连接、5 个工具可用。
+   首次会提示批准项目级 MCP server `whisper` → 批准。
+3. 验证：在 Claude Code 里输入 `/mcp`，应看到 `whisper` 已连接、5 个工具可用。
 
 ## 让它定期整理
 
@@ -45,7 +49,7 @@ Whisper 系统  ──(MCP, stdio)──  Claude Code (本机, 定时跑)
 1. 调 list_pending_reports() 取待整理会议；没有就结束。
 2. 对每一条：claim_report(id) → get_meeting(id) 拿 template_instructions 和 transcript。
 3. 严格按 template_instructions 生成一份自包含的完整 HTML 文档（内联 CSS、中文、排版美观、
-   善用表格/列表/层级体现要点关联；忠于转录、不杜撰）。
+   善用表格/列表/层级体现要点关联；忠于转录、不杜撰；剔除明显的混录噪声）。
 4. submit_report(id, html=<完整HTML>, summary=<一句话摘要>)。
 5. 任何一条失败就 report_failed(id, error) 并继续下一条。
 ```

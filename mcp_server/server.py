@@ -21,12 +21,19 @@ _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 os.chdir(_ROOT)
 
+import logging  # noqa: E402
+
+import structlog  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
 from app.database import SessionLocal  # noqa: E402
 from app.models import Meeting  # noqa: E402
 from app.services import reports as reports_svc  # noqa: E402
+
+# MCP stdio：stdout 只能承载 JSON-RPC，所有日志强制走 stderr，否则会污染协议
+logging.basicConfig(stream=sys.stderr, level=logging.WARNING, force=True)
+structlog.configure(logger_factory=structlog.PrintLoggerFactory(file=sys.stderr))
 
 mcp = FastMCP("whisper-server")
 

@@ -45,11 +45,13 @@ RUN uv pip install --system --no-cache \
         "python-dotenv>=1.0.1" \
         "structlog>=24.4.0" \
         "tenacity>=9.0.0" \
-        "weasyprint>=62.0"
+        "weasyprint>=62.0" \
+        "mcp>=1.2.0"
 
 # 复制应用代码
 COPY app/ /app/app/
 COPY worker/ /app/worker/
+COPY mcp_server/ /app/mcp_server/
 COPY migrations/ /app/migrations/
 COPY seeds/ /app/seeds/
 COPY scripts/ /app/scripts/
