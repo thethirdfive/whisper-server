@@ -159,38 +159,40 @@
     if (!tray) {
       tray = el("div", { id: "upload-tray", style:
         "position:fixed;right:16px;bottom:16px;width:340px;max-height:60vh;overflow:auto;z-index:9999;" +
-        "background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);font-size:13px;" });
+        "background:rgba(14,22,40,.92);border:1px solid rgba(34,211,238,.22);border-radius:12px;" +
+        "box-shadow:0 14px 44px rgba(0,0,0,.55);color:#dce7f7;backdrop-filter:blur(12px);" +
+        "-webkit-backdrop-filter:blur(12px);font-size:13px;" });
       document.body.appendChild(tray);
     }
     const STATUS = { queued: "排队中", uploading: "上传中", done: "已排队转录 ✓", interrupted: "已中断", failed: "失败" };
-    const COLOR = { queued: "#64748b", uploading: "#2563eb", done: "#16a34a", interrupted: "#d97706", failed: "#dc2626" };
+    const COLOR = { queued: "#94a3b8", uploading: "#22d3ee", done: "#34d399", interrupted: "#fbbf24", failed: "#fb7185" };
     tray.innerHTML = "";
     tray.appendChild(el("div", { style:
-      "padding:8px 12px;border-bottom:1px solid #f1f5f9;font-weight:600;display:flex;justify-content:space-between;align-items:center;" },
-      `上传 (${state.jobs.length}) <span id="ul-min" style="cursor:pointer;color:#94a3b8;font-weight:400">—</span>`));
+      "padding:9px 12px;border-bottom:1px solid rgba(120,160,220,.14);font-weight:600;display:flex;justify-content:space-between;align-items:center;" },
+      `<span class="text-gradient">上传</span> <span style="color:#6f819f;font-weight:400">(${state.jobs.length})</span> <span id="ul-min" style="cursor:pointer;color:#6f819f;font-weight:400;margin-left:auto">—</span>`));
     const body = el("div", { id: "ul-body", style: "padding:4px 0;" });
     for (const j of state.jobs) {
       const { up, total, pct } = totals(j);
-      const row = el("div", { style: "padding:8px 12px;border-bottom:1px solid #f8fafc;" });
+      const row = el("div", { style: "padding:9px 12px;border-bottom:1px solid rgba(120,160,220,.08);" });
       const speed = (j.status === "uploading" && j.files.some((f) => f.speed))
         ? "  " + fmtBytes(j.files.reduce((s, f) => s + (f.speed || 0), 0)) + "/s" : "";
       row.appendChild(el("div", { style: "display:flex;justify-content:space-between;gap:8px;" },
         `<span style="font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${escapeHtml(j.title)}</span>
          <span style="color:${COLOR[j.status]};white-space:nowrap">${STATUS[j.status]}</span>`));
       if (["uploading", "queued", "interrupted"].includes(j.status)) {
-        const barOuter = el("div", { style: "height:6px;background:#f1f5f9;border-radius:3px;margin:5px 0;overflow:hidden;" });
+        const barOuter = el("div", { style: "height:6px;background:rgba(148,163,184,.18);border-radius:3px;margin:5px 0;overflow:hidden;" });
         barOuter.appendChild(el("div", { style: `height:6px;width:${pct}%;background:${COLOR[j.status]};transition:width .2s;` }));
         row.appendChild(barOuter);
         row.appendChild(el("div", { style: "color:#94a3b8;font-size:11px;" },
           `${fmtBytes(up)} / ${fmtBytes(total)} · ${pct}%${speed}`));
       }
-      if (j.error && j.status !== "done") row.appendChild(el("div", { style: "color:#dc2626;font-size:11px;margin-top:2px;" }, escapeHtml(j.error)));
+      if (j.error && j.status !== "done") row.appendChild(el("div", { style: "color:#fb7185;font-size:11px;margin-top:2px;" }, escapeHtml(j.error)));
       // 操作
       const actions = el("div", { style: "margin-top:6px;display:flex;gap:10px;" });
       if (j.status === "interrupted") {
         const pick = el("input", { type: "file", multiple: "", style: "display:none" });
         pick.addEventListener("change", (e) => resumeJob(j.id, e.target.files));
-        const btn = el("a", { href: "#", style: "color:#2563eb;font-size:12px;" }, "重选文件续传");
+        const btn = el("a", { href: "#", style: "color:#22d3ee;font-size:12px;" }, "重选文件续传");
         btn.addEventListener("click", (e) => { e.preventDefault(); pick.click(); });
         actions.appendChild(btn); actions.appendChild(pick);
       }
@@ -211,7 +213,7 @@
     });
   }
   function linkBtn(text, href, onclick, color) {
-    const a = el("a", { href, style: `color:${color || "#2563eb"};font-size:12px;` }, text);
+    const a = el("a", { href, style: `color:${color || "#22d3ee"};font-size:12px;` }, text);
     a.addEventListener("click", onclick);
     return a;
   }

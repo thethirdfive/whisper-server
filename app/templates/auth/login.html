@@ -4,10 +4,22 @@
 {% block content %}
 <div class="min-h-screen flex items-center justify-center -mt-20">
     <div class="max-w-sm w-full bg-white rounded-xl shadow-md p-8">
-        <div class="text-center mb-6">
-            <div class="text-4xl mb-2">🎙</div>
-            <h1 class="text-xl font-bold">whisper-server</h1>
-            <p class="text-sm text-slate-500 mt-1">私人会议转录系统</p>
+        <div class="text-center mb-7">
+            <div class="flex justify-center mb-3 glow-cyan">
+                <svg class="logo-wave" width="58" height="58" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs><linearGradient id="wgrad2" x1="6" y1="6" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs>
+                    <rect x="2.5" y="2.5" width="35" height="35" rx="11" fill="url(#wgrad2)" fill-opacity="0.12" stroke="url(#wgrad2)" stroke-opacity="0.5" stroke-width="1.4"/>
+                    <g fill="url(#wgrad2)">
+                        <rect x="9" y="17" width="3" height="6" rx="1.5"/>
+                        <rect x="14.5" y="13" width="3" height="14" rx="1.5"/>
+                        <rect x="20" y="8" width="3" height="24" rx="1.5"/>
+                        <rect x="25.5" y="14" width="3" height="12" rx="1.5"/>
+                        <rect x="31" y="18" width="3" height="4" rx="1.5"/>
+                    </g>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight"><span class="text-gradient">whisper</span></h1>
+            <p class="text-sm text-slate-500 mt-1.5">私人会议转录系统 · 本地 GPU · 端到端可检索</p>
         </div>
 
         {% if error == "invalid" %}

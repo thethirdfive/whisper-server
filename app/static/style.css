@@ -1,25 +1,162 @@
-/* whisper-server 自定义样式（Tailwind 之外的补充） */
+/* ============================================================================
+ * whisper-server · 深空暗色 · 青蓝霓虹主题
+ * 思路：模板沿用 Tailwind 浅色工具类，这里统一覆盖中性色/强调色为暗色科技风，
+ *       所有页面一次性变暗，无需逐个改模板。
+ * ========================================================================== */
 
-/* 滚动条样式 */
-::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-::-webkit-scrollbar-track {
-    background: #f1f5f9;
-}
-::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+:root {
+  --bg: #070b14;
+  --surface: rgba(18, 27, 46, 0.55);
+  --surface-2: rgba(12, 19, 36, 0.7);
+  --border: rgba(120, 160, 220, 0.12);
+  --border-strong: rgba(34, 211, 238, 0.28);
+  --txt: #dce7f7;
+  --txt-2: #9fb1cf;
+  --txt-3: #6f819f;
+  --txt-4: #4d5d7c;
+  --cyan: #22d3ee;
+  --blue: #3b82f6;
+  --grad: linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%);
+  --grad-bright: linear-gradient(135deg, #22d3ee 0%, #6366f1 100%);
 }
 
-/* 中英文混排字体 */
+/* ---- 字体（中英文混排，系统字体，国内可靠） ---- */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-                 "Microsoft YaHei", "Hiragino Sans GB", "Helvetica Neue",
-                 Helvetica, Arial, sans-serif;
-    font-feature-settings: "tnum";
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+               "Microsoft YaHei", "Hiragino Sans GB", "Helvetica Neue",
+               Helvetica, Arial, sans-serif;
+  font-feature-settings: "tnum";
+  color: var(--txt);
+  -webkit-font-smoothing: antialiased;
 }
+h1, h2, h3, .font-bold, .font-semibold { letter-spacing: -0.01em; }
+
+/* ---- 深空背景：径向光晕 + 细网格 ---- */
+html, body { background: var(--bg); }
+body::before {
+  content: ""; position: fixed; inset: 0; z-index: -2;
+  background:
+    radial-gradient(900px 520px at 10% -12%, rgba(34, 211, 238, 0.12), transparent 60%),
+    radial-gradient(820px 520px at 105% -5%, rgba(59, 130, 246, 0.14), transparent 55%),
+    radial-gradient(760px 620px at 50% 118%, rgba(99, 102, 241, 0.10), transparent 60%),
+    var(--bg);
+}
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: -1; opacity: 0.5;
+  background-image:
+    linear-gradient(rgba(120, 160, 220, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 160, 220, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 80%);
+          mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 80%);
+}
+
+/* ---- 背景类覆盖 ---- */
+.bg-slate-50 { background: transparent !important; }
+.bg-white {
+  background: var(--surface) !important;
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 10px 34px rgba(2, 6, 18, 0.5) !important;
+}
+.bg-slate-100 { background: rgba(148, 163, 184, 0.10) !important; }
+.bg-slate-50\/50, .bg-slate-50\/40 { background: rgba(148, 163, 184, 0.04) !important; }
+
+/* ---- 边框 ---- */
+.border-slate-200, .border-slate-300, .border-slate-100 { border-color: var(--border) !important; }
+
+/* ---- 文本 ---- */
+.text-slate-900, .text-slate-800 { color: var(--txt) !important; }
+.text-slate-700 { color: #c4d2e8 !important; }
+.text-slate-600, .text-slate-500 { color: var(--txt-2) !important; }
+.text-slate-400 { color: var(--txt-3) !important; }
+.text-slate-300 { color: var(--txt-4) !important; }
+
+/* ---- 强调 / 链接 / 主按钮 ---- */
+.text-blue-600, .text-blue-700 { color: var(--cyan) !important; }
+.bg-blue-50 { background: rgba(34, 211, 238, 0.10) !important; }
+.bg-blue-600 {
+  background: var(--grad) !important;
+  box-shadow: 0 6px 22px rgba(34, 211, 238, 0.22), 0 2px 6px rgba(59, 130, 246, 0.25);
+  border: none;
+}
+.bg-blue-600:hover, .hover\:bg-blue-700:hover { filter: brightness(1.1); background: var(--grad) !important; }
+a { transition: color 0.15s; }
+button, .rounded-md, .rounded-lg { transition: filter 0.15s, transform 0.1s, box-shadow 0.2s; }
+button:active { transform: translateY(1px); }
+
+/* ---- 语义徽章 / 提示 ---- */
+.bg-green-50  { background: rgba(16, 185, 129, 0.12) !important; }
+.text-green-700 { color: #34d399 !important; }
+.border-green-200 { border-color: rgba(16, 185, 129, 0.30) !important; }
+.bg-red-50 { background: rgba(244, 63, 94, 0.12) !important; }
+.text-red-700, .text-red-600, .text-red-500 { color: #fb7185 !important; }
+.border-red-200 { border-color: rgba(244, 63, 94, 0.30) !important; }
+.bg-amber-50 { background: rgba(245, 158, 11, 0.12) !important; }
+.text-amber-700, .text-amber-600 { color: #fbbf24 !important; }
+.border-amber-200 { border-color: rgba(245, 158, 11, 0.30) !important; }
+.bg-indigo-50 { background: rgba(99, 102, 241, 0.16) !important; }
+.text-indigo-700 { color: #a5b4fc !important; }
+.bg-purple-50 { background: rgba(168, 85, 247, 0.16) !important; }
+.text-purple-700 { color: #c4b5fd !important; }
+
+/* ---- 表单控件 ---- */
+input, textarea, select {
+  background: var(--surface-2) !important;
+  color: var(--txt) !important;
+  border-color: var(--border) !important;
+}
+input::placeholder, textarea::placeholder { color: var(--txt-4) !important; }
+select option { background: #0d1426; color: var(--txt); }
+.focus\:ring-blue-500:focus { --tw-ring-color: rgba(34, 211, 238, 0.55) !important; }
+.focus\:border-blue-500:focus, input:focus, textarea:focus, select:focus { border-color: var(--cyan) !important; }
+.file\:bg-blue-50::file-selector-button { background: rgba(34, 211, 238, 0.12); color: var(--cyan); }
+.hover\:file\:bg-blue-100:hover::file-selector-button { background: rgba(34, 211, 238, 0.2); }
+input[type="checkbox"] { accent-color: var(--cyan); }
+
+/* ---- 其它工具类覆盖 ---- */
+pre { background: var(--surface-2) !important; color: #b9c7e0 !important; border-color: var(--border) !important; }
+.hover\:bg-slate-50:hover { background: rgba(148, 163, 184, 0.06) !important; }
+.hover\:bg-blue-100:hover { background: rgba(34, 211, 238, 0.18) !important; }
+.hover\:bg-blue-50:hover { background: rgba(34, 211, 238, 0.12) !important; }
+.hover\:text-slate-900:hover { color: #fff !important; }
+.hover\:text-slate-700:hover { color: var(--txt) !important; }
+.divide-slate-100 > * + *, .divide-slate-200 > * + * { border-color: var(--border) !important; }
+
+/* ---- 渐变文字 / 发光（科技点缀） ---- */
+.text-gradient {
+  background: var(--grad-bright);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.glow-cyan { filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.55)); }
+
+/* ---- 顶栏 ---- */
+header.bg-white {
+  background: rgba(8, 13, 24, 0.72) !important;
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: none !important;
+}
+.nav-link { position: relative; }
+.nav-link:hover { color: var(--cyan) !important; }
+
+/* ---- 滚动条 ---- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(120, 160, 220, 0.22); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(34, 211, 238, 0.5); }
+
+/* ---- Logo 波形脉动 ---- */
+@keyframes wf {
+  0%, 100% { transform: scaleY(0.7); opacity: 0.85; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+.logo-wave rect { transform-origin: center; animation: wf 1.8s ease-in-out infinite; }
+.logo-wave rect:nth-child(2) { animation-delay: 0.15s; }
+.logo-wave rect:nth-child(3) { animation-delay: 0.3s; }
+.logo-wave rect:nth-child(4) { animation-delay: 0.45s; }
+.logo-wave rect:nth-child(5) { animation-delay: 0.6s; }
+@media (prefers-reduced-motion: reduce) { .logo-wave rect { animation: none; } }

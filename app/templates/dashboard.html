@@ -3,55 +3,71 @@
 
 {% block content %}
 <div class="space-y-6">
-    <div>
-        <h1 class="text-2xl font-bold">欢迎回来，{{ user.display_name }}</h1>
-        <p class="text-sm text-slate-500 mt-1">
-            Welcome back, {{ user.display_name }}.
-            上次登录 / Last login:
-            {{ user.last_login_at.strftime("%Y-%m-%d %H:%M") if user.last_login_at else "首次登录" }}
-        </p>
+    <!-- Hero -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-8 relative overflow-hidden">
+        <svg class="absolute right-4 top-1/2 -translate-y-1/2 opacity-20 hidden md:block" width="240" height="120" viewBox="0 0 240 120" fill="none" aria-hidden="true">
+            <defs><linearGradient id="hero" x1="0" y1="0" x2="240" y2="0" gradientUnits="userSpaceOnUse"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs>
+            <g fill="url(#hero)">
+                {% for h in [22,40,64,90,58,34,72,96,50,28,60,84,44,20,52,76] %}
+                <rect x="{{ loop.index0 * 15 + 4 }}" y="{{ 60 - h/2 }}" width="6" height="{{ h }}" rx="3"/>
+                {% endfor %}
+            </g>
+        </svg>
+        <div class="relative z-10">
+            <p class="text-[11px] tracking-[0.25em] uppercase text-cyan-300" style="color:#67e8f9">whisper · 转录 → 整理 → 检索</p>
+            <h1 class="text-3xl font-bold mt-2">欢迎回来，<span class="text-gradient">{{ user.display_name }}</span></h1>
+            <p class="text-sm text-slate-500 mt-2 max-w-xl">
+                把会议、访谈、培训里的每一句话，变成可搜索、可整理、可分发的结构化智慧。
+                <span class="text-slate-400">上次登录 {{ user.last_login_at.strftime("%Y-%m-%d %H:%M") if user.last_login_at else "首次登录" }}</span>
+            </p>
+            <div class="mt-5 flex flex-wrap gap-3">
+                <a href="/meetings/new" class="bg-blue-600 text-white text-sm font-medium px-5 py-2 rounded-md">+ 上传会议</a>
+                <a href="/meetings" class="text-sm border border-slate-200 px-5 py-2 rounded-md hover:bg-slate-50">查看会议</a>
+            </div>
+        </div>
     </div>
 
     <!-- 统计卡 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-            <div class="text-3xl">🏷</div>
-            <div class="text-2xl font-bold mt-2">{{ scenario_count }}</div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="text-2xl">🏷</div>
+            <div class="text-3xl font-bold mt-2 text-gradient inline-block">{{ scenario_count }}</div>
             <div class="text-sm text-slate-500">场景 / Scenarios</div>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-            <div class="text-3xl">📚</div>
-            <div class="text-2xl font-bold mt-2">{{ vocab_count }}</div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="text-2xl">📚</div>
+            <div class="text-3xl font-bold mt-2 text-gradient inline-block">{{ vocab_count }}</div>
             <div class="text-sm text-slate-500">词库 / Vocabularies</div>
         </div>
-        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-            <div class="text-3xl">📝</div>
-            <div class="text-2xl font-bold mt-2">{{ term_count }}</div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="text-2xl">📝</div>
+            <div class="text-3xl font-bold mt-2 text-gradient inline-block">{{ term_count }}</div>
             <div class="text-sm text-slate-500">术语词条 / Terms</div>
         </div>
     </div>
 
     <!-- 系统状态 -->
-    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-        <h2 class="font-semibold mb-4">系统状态 / System</h2>
-        <dl class="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-            <dt class="text-slate-500">环境</dt>
-            <dd class="font-mono">{{ settings.app_env }}</dd>
-            <dt class="text-slate-500">公网地址</dt>
-            <dd class="font-mono">{{ settings.app_public_url }}</dd>
-            <dt class="text-slate-500">Whisper 模型</dt>
-            <dd class="font-mono">{{ settings.whisper_model }}</dd>
-            <dt class="text-slate-500">说话人分离</dt>
-            <dd class="font-mono">{{ settings.diarize_model }}</dd>
-            <dt class="text-slate-500">GPU 模式</dt>
-            <dd class="font-mono">{{ settings.whisper_device }}</dd>
+    <div class="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 class="font-semibold mb-4 flex items-center gap-2"><span class="glow-cyan" style="color:#22d3ee">◈</span> 系统状态 / System</h2>
+        <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="text-slate-400 text-xs">环境</dt><dd class="font-mono">{{ settings.app_env }}</dd></div>
+            <div><dt class="text-slate-400 text-xs">公网地址</dt><dd class="font-mono break-all">{{ settings.app_public_url }}</dd></div>
+            <div><dt class="text-slate-400 text-xs">GPU 模式</dt><dd class="font-mono">{{ settings.whisper_device }}</dd></div>
+            <div><dt class="text-slate-400 text-xs">Whisper 模型</dt><dd class="font-mono">{{ settings.whisper_model }}</dd></div>
+            <div class="md:col-span-2"><dt class="text-slate-400 text-xs">说话人分离</dt><dd class="font-mono break-all">{{ settings.diarize_model }}</dd></div>
         </dl>
     </div>
 
-    <!-- 开发进度提示 -->
-    <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm">
-        <strong>🚧 这是 Phase 1 MVP 骨架</strong>
-        — 上传会议、转录、词库管理等功能正在补完，详见 README.md 的"开发进度"章节。
+    <!-- 能力一览 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <a href="/meetings/new" class="bg-white rounded-xl border border-slate-200 p-5 hover:bg-slate-50 block">
+            <div class="font-semibold">🎙 上传与转录</div>
+            <p class="text-sm text-slate-500 mt-1">本地 GPU（WhisperX + large-v3）、说话人分离、后台分块断点续传、Google Drive 直拉。</p>
+        </a>
+        <a href="/scenarios" class="bg-white rounded-xl border border-slate-200 p-5 hover:bg-slate-50 block">
+            <div class="font-semibold">📋 场景化整理</div>
+            <p class="text-sm text-slate-500 mt-1">按场景词库提升识别、按场景模板生成 HTML 报告（Claude Code 经 MCP 自动整理）。</p>
+        </a>
     </div>
 </div>
 {% endblock %}

@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{% block title %}whisper-server{% endblock %}</title>
+    <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+    <meta name="theme-color" content="#070b14" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/htmx.org@2.0.3"></script>
     <script src="/static/upload.js" defer></script>
@@ -16,11 +18,26 @@
             <div class="flex justify-between h-14 items-center">
                 <div class="flex items-center space-x-6"
                      hx-boost="true" hx-target="#page" hx-select="#page" hx-swap="outerHTML show:window:top">
-                    <a href="/" class="font-bold text-lg">🎙 whisper-server</a>
-                    <a href="/meetings" class="text-sm text-slate-600 hover:text-slate-900">会议 / Meetings</a>
-                    <a href="/scenarios" class="text-sm text-slate-600 hover:text-slate-900">场景 / Scenarios</a>
-                    <a href="/vocabularies" class="text-sm text-slate-600 hover:text-slate-900">词库 / Vocabularies</a>
-                    <a href="/settings" class="text-sm text-slate-600 hover:text-slate-900">设置 / Settings</a>
+                    <a href="/" class="flex items-center gap-2 font-bold text-lg">
+                        <span class="glow-cyan">
+                            <svg class="logo-wave" width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <defs><linearGradient id="navlogo" x1="6" y1="6" x2="34" y2="34" gradientUnits="userSpaceOnUse"><stop stop-color="#22d3ee"/><stop offset="1" stop-color="#6366f1"/></linearGradient></defs>
+                                <rect x="2.5" y="2.5" width="35" height="35" rx="11" fill="url(#navlogo)" fill-opacity="0.12" stroke="url(#navlogo)" stroke-opacity="0.5" stroke-width="1.4"/>
+                                <g fill="url(#navlogo)">
+                                    <rect x="9" y="17" width="3" height="6" rx="1.5"/>
+                                    <rect x="14.5" y="13" width="3" height="14" rx="1.5"/>
+                                    <rect x="20" y="8" width="3" height="24" rx="1.5"/>
+                                    <rect x="25.5" y="14" width="3" height="12" rx="1.5"/>
+                                    <rect x="31" y="18" width="3" height="4" rx="1.5"/>
+                                </g>
+                            </svg>
+                        </span>
+                        <span class="text-gradient tracking-tight">whisper</span>
+                    </a>
+                    <a href="/meetings" class="nav-link text-sm text-slate-600">会议 / Meetings</a>
+                    <a href="/scenarios" class="nav-link text-sm text-slate-600">场景 / Scenarios</a>
+                    <a href="/vocabularies" class="nav-link text-sm text-slate-600">词库 / Vocabularies</a>
+                    <a href="/settings" class="nav-link text-sm text-slate-600">设置 / Settings</a>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span class="text-sm text-slate-500">{{ user.display_name }} ({{ user.role }})</span>
@@ -37,8 +54,10 @@
         <div id="page">{% block content %}{% endblock %}</div>
     </main>
 
-    <footer class="text-center text-xs text-slate-400 py-6">
-        whisper-server v{{ app_version }}
+    <footer class="text-center text-xs text-slate-400 py-8 space-x-2">
+        <span class="text-gradient font-semibold">whisper</span>
+        <span class="text-slate-500">· 把每一次对话，沉淀为可检索的智慧</span>
+        <span class="text-slate-600">· v{{ app_version }}</span>
     </footer>
 </body>
 </html>
