@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}搜索 / Search - whisper-server{% endblock %}
+
+{% block content %}
+<div class="space-y-6 max-w-3xl mx-auto">
+    <div>
+        <h1 class="text-2xl font-bold">搜索 / Search</h1>
+        <p class="text-sm text-slate-500 mt-1">搜索所有会议的转录正文、标题、公司、标签（中英文均可）。</p>
+    </div>
+
+    <form method="get" action="/search" class="flex gap-2">
+        <input name="q" value="{{ q }}" autofocus autocomplete="off"
+               placeholder="输入关键词，如「报价」「土耳其展会」「下一步」…"
+               class="flex-1 px-4 py-2.5 border border-slate-300 rounded-md text-sm
+                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+        <button class="bg-blue-600 text-white text-sm font-medium px-6 py-2 rounded-md">搜索</button>
+    </form>
+
+    {% if q %}
+    <p class="text-sm text-slate-500">
+        {% if groups %}
+            在 <span class="text-slate-300">{{ groups|length }}</span> 场会议中找到
+            {%- if total %} <span class="text-slate-300">{{ total }}</span> 处转录命中{% endif %}
+            {%- if mode == 'like' %}（关键词较短，用子串匹配）{% endif %}
+        {% else %}
+            没有找到「{{ q }}」相关内容。{% if q|length < 3 %}（提示：中文 ≥3 字检索更准）{% endif %}
+        {% endif %}
+    </p>
+
+    <div class="space-y-4">
+        {% for g in groups %}
+        <div class="bg-white rounded-xl border border-slate-200 p-5">
+            <div class="flex items-start justify-between gap-3">
+                <a href="/meetings/{{ g.meeting.id }}" class="font-semibold text-slate-900 hover:text-blue-600">{{ g.meeting.title }}</a>
+                <span class="text-xs text-slate-400 whitespace-nowrap">
+                    {{ g.meeting.held_at.strftime("%Y-%m-%d") if g.meeting.held_at else "" }}
+                    {%- if g.meeting.scenario %} · {{ g.meeting.scenario.name_zh }}{% endif %}
+                </span>
+            </div>
+            {% if g.hits %}
+            <ul class="mt-2.5 space-y-1.5">
+                {% for h in g.hits %}
+                <li class="text-sm text-slate-600 flex gap-2.5">
+                    <span class="text-xs text-slate-400 font-mono pt-0.5 whitespace-nowrap">{{ "%02d:%02d"|format((h.start_sec|int)//60, (h.start_sec|int)%60) }}</span>
+                    <span class="leading-relaxed">{{ h.snippet|safe }}</span>
+                </li>
+                {% endfor %}
+                {% if g.n > g.hits|length %}
+                <li class="text-xs text-slate-400">…该会议共 {{ g.n }} 处命中</li>
+                {% endif %}
+            </ul>
+            {% elif g.title_match %}
+            <p class="text-xs text-slate-400 mt-1.5">标题 / 公司 / 标签命中</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm text-slate-400">输入关键词开始搜索。</p>
+    {% endif %}
+</div>
+{% endblock %}

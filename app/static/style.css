@@ -124,6 +124,9 @@ pre { background: var(--surface-2) !important; color: #b9c7e0 !important; border
 .hover\:text-slate-700:hover { color: var(--txt) !important; }
 .divide-slate-100 > * + *, .divide-slate-200 > * + * { border-color: var(--border) !important; }
 
+/* ---- 搜索高亮 ---- */
+mark { background: rgba(34, 211, 238, 0.24); color: #a5f3fc; border-radius: 2px; padding: 0 2px; }
+
 /* ---- 渐变文字 / 发光（科技点缀） ---- */
 .text-gradient {
   background: var(--grad-bright);
