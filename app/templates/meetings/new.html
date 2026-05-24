@@ -113,6 +113,22 @@
                 音频：{{ allowed_audio|join(", ") }}<br>
                 视频：{{ allowed_video|join(", ") }}
             </p>
+            {% if gdrive_enabled %}
+            <div class="mt-3 pt-3 border-t border-slate-100">
+                <button type="button" id="drive-pick-btn"
+                        class="inline-flex items-center gap-2 text-sm border border-slate-300 rounded-md px-4 py-2 hover:bg-slate-50">
+                    <span>📁</span> 从 Google Drive 选择
+                </button>
+                <p class="text-xs text-slate-400 mt-1">
+                    在 Drive 里选音/视频文件，服务器**直接拉取**（不占你的上行带宽，适合大文件）。先填好上方标题/场景等再点。
+                </p>
+            </div>
+            {% else %}
+            <p class="text-xs text-slate-400 mt-2">
+                想从 Google Drive 选文件？去 <a href="/settings" class="text-blue-600 hover:underline">设置</a>
+                填 Google OAuth 客户端 ID 和 API Key。
+            </p>
+            {% endif %}
         </div>
 
         <div class="flex items-center gap-3 pt-2">
@@ -158,4 +174,87 @@
         });
     })();
 </script>
+
+{% if gdrive_enabled %}
+<script>
+    // Google Drive Picker：浏览器选文件 → 服务端用短期 token 直接拉取
+    (function () {
+        const CLIENT_ID = {{ gdrive_client_id|tojson }};
+        const API_KEY = {{ gdrive_api_key|tojson }};
+        const APP_ID = CLIENT_ID.split("-")[0];
+        const SCOPE = "https://www.googleapis.com/auth/drive.file";
+        const form = document.getElementById("upload-form");
+        const btn = document.getElementById("drive-pick-btn");
+        const val = (n) => { const e = form.querySelector('[name="' + n + '"]'); return e ? e.value : ""; };
+        let tokenClient = null, accessToken = null;
+
+        function loadScript(src) {
+            return new Promise((res, rej) => {
+                if ([...document.scripts].some((s) => s.src === src)) return res();
+                const s = document.createElement("script");
+                s.src = src; s.onload = res; s.onerror = () => rej(new Error("加载失败 " + src));
+                document.head.appendChild(s);
+            });
+        }
+        async function ensureGoogle() {
+            await loadScript("https://apis.google.com/js/api.js");
+            await new Promise((res) => gapi.load("picker", res));
+            await loadScript("https://accounts.google.com/gsi/client");
+            if (!tokenClient) {
+                tokenClient = google.accounts.oauth2.initTokenClient({ client_id: CLIENT_ID, scope: SCOPE, callback: () => {} });
+            }
+        }
+        function getToken() {
+            return new Promise((res, rej) => {
+                tokenClient.callback = (r) => { if (r.error) rej(new Error(r.error)); else { accessToken = r.access_token; res(); } };
+                tokenClient.requestAccessToken({ prompt: accessToken ? "" : "consent" });
+            });
+        }
+        function showPicker() {
+            return new Promise((res) => {
+                const view = new google.picker.DocsView(google.picker.ViewId.DOCS).setSelectFolderEnabled(false);
+                const picker = new google.picker.PickerBuilder()
+                    .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+                    .setDeveloperKey(API_KEY).setAppId(APP_ID).setOAuthToken(accessToken)
+                    .addView(view)
+                    .setCallback((data) => {
+                        if (data.action === google.picker.Action.PICKED) {
+                            res(data.docs.map((d) => ({ file_id: d.id, name: d.name, size: Number(d.sizeBytes || 0) })));
+                        } else if (data.action === google.picker.Action.CANCEL) { res([]); }
+                    }).build();
+                picker.setVisible(true);
+            });
+        }
+        if (btn) btn.addEventListener("click", async () => {
+            if (!val("title").trim()) { alert("请先填写会议标题"); return; }
+            btn.disabled = true; btn.textContent = "连接 Google…";
+            try {
+                await ensureGoogle();
+                await getToken();
+                const files = await showPicker();
+                if (!files.length) return;
+                const meta = {
+                    title: val("title").trim(), scenario_id: val("scenario_id"), language: val("language"),
+                    company: val("company"), held_at: val("held_at"), tags: val("tags"),
+                    custom_prompt: val("custom_prompt"), diarize_mode: val("diarize_mode"),
+                    num_speakers: val("num_speakers"), min_speakers: val("min_speakers"), max_speakers: val("max_speakers"),
+                    access_token: accessToken, files,
+                };
+                const r = await fetch("/meetings/drive", {
+                    method: "POST", credentials: "same-origin",
+                    headers: { "Content-Type": "application/json" }, body: JSON.stringify(meta),
+                });
+                const d = await r.json().catch(() => ({}));
+                if (!r.ok) { alert(d.detail || "创建失败"); return; }
+                if (window.htmx) window.htmx.ajax("GET", "/meetings/" + d.meeting_id, { target: "#page", select: "#page", swap: "outerHTML" });
+                else window.location.href = "/meetings/" + d.meeting_id;
+            } catch (e) {
+                alert("Google Drive 出错：" + (e.message || e));
+            } finally {
+                btn.disabled = false; btn.innerHTML = "<span>📁</span> 从 Google Drive 选择";
+            }
+        });
+    })();
+</script>
+{% endif %}
 {% endblock %}

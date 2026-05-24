@@ -1,5 +1,6 @@
 {% set status_styles = {
     "uploading": "bg-indigo-50 text-indigo-700",
+    "downloading": "bg-indigo-50 text-indigo-700",
     "uploaded": "bg-slate-100 text-slate-600",
     "queued": "bg-amber-50 text-amber-700",
     "processing": "bg-blue-50 text-blue-700",
@@ -7,14 +8,16 @@
     "failed": "bg-red-50 text-red-700",
 } %}
 <div id="job-status"
-     {% if meeting.status in ["queued", "processing"] %}
+     {% if meeting.status in ["queued", "processing", "downloading"] %}
      hx-get="/meetings/{{ meeting.id }}/status"
      hx-trigger="every 3s"
      hx-swap="outerHTML"
      {% endif %}>
     <div class="flex items-center gap-3">
         <span class="text-xs px-2 py-0.5 rounded {{ status_styles.get(meeting.status, 'bg-slate-100 text-slate-600') }}">{{ meeting.status }}</span>
-        {% if job and meeting.status in ["queued", "processing"] %}
+        {% if meeting.status == "downloading" %}
+        <span class="text-sm text-slate-500">从 Google Drive 下载中…</span>
+        {% elif job and meeting.status in ["queued", "processing"] %}
         <span class="text-sm text-slate-500">{{ job.progress }}%{% if job.message %} · {{ job.message }}{% endif %}</span>
         {% endif %}
     </div>

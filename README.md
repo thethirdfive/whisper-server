@@ -166,6 +166,14 @@ whisper-server/
   - `.mcp.json` + `.venv-mcp` 让本机 Claude Code 即插即用；用 `/schedule` 或 `/loop` 定期整理
   - 整理器走 Claude Max 订阅，几乎零额外费用；方案二（LLM API）可复用同一队列/模板/产出
 
+### ✅ 已完成 (Day 11)
+
+- Google Drive 拉取（Picker）：网页里用 Google Picker 选 Drive 文件 → 服务端用短期
+  token **直接从 Drive 下载**（机房↔Google，绕开 WAN 上行，适合大文件）→ 入队转录。
+  - 配置：在「设置」填 `GDRIVE_OAUTH_CLIENT_ID` + `GDRIVE_API_KEY`（GCP 建 OAuth Web
+    客户端 + API Key，启用 Picker/Drive API）；未配置则上传页不显示该入口
+  - app 容器经本机代理出站（国内访问 googleapis.com 必需，复用 worker 的代理设置）
+
 ### 🚧 进行中 / 下一步
 
 - [ ] 场景↔词库关联在线编辑（设置项在线修改已完成）

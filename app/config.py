@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     whisper_max_prompt_terms: int = 80
 
     # === Google Drive ===
+    # Picker（浏览器选文件）用：OAuth Web 客户端 ID + API Key（都会暴露给前端，非机密）
+    gdrive_oauth_client_id: str = ""
+    gdrive_api_key: str = ""
     gdrive_credentials_json: str = "/data/whisper/gdrive_creds.json"
     gdrive_root_folder_id: str = ""
     gdrive_meeting_folder_id: str = ""

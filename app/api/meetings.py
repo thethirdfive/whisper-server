@@ -4,7 +4,17 @@ from datetime import datetime
 from pathlib import Path
 
 import structlog
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -17,8 +27,9 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.auth import require_login
-from app.database import get_db
+from app.database import SessionLocal, get_db
 from app.models import AudioFile, Deliverable, Job, Meeting, Scenario, Segment, Speaker, User
+from app.services import gdrive as gdrive_svc
 from app.services import queue as queue_svc
 from app.services import reports as reports_svc
 from app.services import settings_store, storage
@@ -103,6 +114,8 @@ def new_meeting(
 ):
     scenarios = db.execute(select(Scenario).order_by(Scenario.sort_order, Scenario.id)).scalars().all()
     max_mb, audio_set, video_set = settings_store.effective_upload(db)
+    gdrive_client_id = str(settings_store.effective(db, "gdrive_oauth_client_id"))
+    gdrive_api_key = str(settings_store.effective(db, "gdrive_api_key"))
     return templates.TemplateResponse(
         request,
         "meetings/new.html",
@@ -113,6 +126,9 @@ def new_meeting(
             "allowed_audio": sorted(audio_set),
             "allowed_video": sorted(video_set),
             "max_size_mb": max_mb,
+            "gdrive_client_id": gdrive_client_id,
+            "gdrive_api_key": gdrive_api_key,
+            "gdrive_enabled": bool(gdrive_client_id and gdrive_api_key),
         },
     )
 
@@ -415,6 +431,120 @@ def cancel_meeting(
     db.commit()
     shutil.rmtree(dest_dir, ignore_errors=True)
     return {"ok": True}
+
+
+# ===========================================================================
+# Google Drive：浏览器 Picker 选文件 → 服务端用短期 token 直接从 Drive 下载
+# ===========================================================================
+class _DriveFile(BaseModel):
+    file_id: str
+    name: str
+    size: int = 0
+
+
+class _DriveRequest(BaseModel):
+    title: str
+    scenario_id: str | None = None
+    company: str = ""
+    held_at: str = ""
+    language: str = "zh"
+    tags: str = ""
+    custom_prompt: str = ""
+    diarize_mode: str = "auto"
+    num_speakers: str = ""
+    min_speakers: str = ""
+    max_speakers: str = ""
+    access_token: str
+    files: list[_DriveFile]
+
+
+def _download_drive_and_enqueue(meeting_id: int, access_token: str) -> None:
+    """后台：用 token 把 Drive 文件下到 recordings，全部就绪后入队转录。"""
+    db = SessionLocal()
+    try:
+        meeting = db.get(Meeting, meeting_id)
+        if not meeting:
+            return
+        afs = db.execute(
+            select(AudioFile).where(AudioFile.meeting_id == meeting_id).order_by(AudioFile.sequence)
+        ).scalars().all()
+        for af in afs:
+            try:
+                size = gdrive_svc.download_file(af.drive_file_id, access_token, Path(af.file_path))
+                af.size_bytes = size
+                af.uploaded_bytes = size
+                af.upload_status = "ready"
+                db.commit()
+            except Exception as e:  # noqa: BLE001
+                log.error("gdrive_download_failed", meeting_id=meeting_id,
+                          file_id=af.drive_file_id, error=str(e))
+                meeting.status = "failed"
+                db.commit()
+                return
+        _enqueue(db, meeting)
+        log.info("drive_meeting_ready", meeting_id=meeting_id, status=meeting.status)
+    finally:
+        db.close()
+
+
+@router.post("/drive")
+def create_from_drive(
+    payload: _DriveRequest,
+    background: BackgroundTasks,
+    user: User = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    title = payload.title.strip()
+    files = [f for f in payload.files if f.file_id and f.name]
+    if not title:
+        raise HTTPException(status_code=400, detail="请填写会议标题")
+    if not files:
+        raise HTTPException(status_code=400, detail="请至少选择一个 Drive 文件")
+    if not payload.access_token:
+        raise HTTPException(status_code=400, detail="缺少 Google 授权令牌")
+
+    max_mb, audio_set, video_set = settings_store.effective_upload(db)
+    allowed = audio_set | video_set
+    for f in files:
+        ext = Path(f.name).suffix.lower().lstrip(".")
+        if ext not in allowed:
+            raise HTTPException(status_code=400, detail=f"不支持的文件类型：.{ext}")
+
+    sid = int(payload.scenario_id) if (payload.scenario_id or "").strip().isdigit() else None
+    mode = _norm_mode(payload.diarize_mode)
+    meeting = Meeting(
+        title=title,
+        scenario_id=sid,
+        company=payload.company.strip() or None,
+        tags=payload.tags.strip() or None,
+        held_at=_parse_held_at(payload.held_at),
+        language=(payload.language.strip() or "zh")[:8],
+        status="downloading",
+        custom_prompt=payload.custom_prompt.strip() or None,
+        diarize_mode=mode,
+        num_speakers=_opt_int(payload.num_speakers) if mode == "count" else None,
+        min_speakers=_opt_int(payload.min_speakers) if mode == "count" else None,
+        max_speakers=_opt_int(payload.max_speakers) if mode == "count" else None,
+        owner_id=user.id,
+    )
+    db.add(meeting)
+    db.flush()
+
+    dest_dir = storage.meeting_recordings_dir(meeting.id)
+    for seq, f in enumerate(files):
+        ext = Path(f.name).suffix.lower().lstrip(".")
+        safe = storage.safe_filename(f.name)
+        dest = dest_dir / f"{seq:02d}_{safe}"
+        db.add(AudioFile(
+            meeting_id=meeting.id, file_path=str(dest), original_name=f.name,
+            media_kind="video" if ext in video_set else "audio",
+            size_bytes=f.size, sequence=seq, source="gdrive", drive_file_id=f.file_id,
+            upload_status="uploading", uploaded_bytes=0,
+        ))
+    db.commit()
+    background.add_task(_download_drive_and_enqueue, meeting.id, payload.access_token)
+    log.info("drive_meeting_created", meeting_id=meeting.id, files=len(files))
+    return {"meeting_id": meeting.id}
 
 
 # ===========================================================================
