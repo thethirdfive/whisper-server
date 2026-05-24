@@ -37,6 +37,8 @@ EDITABLE: list[Field] = [
     Field("whisper_compute_type", "计算精度", "转录", "choice",
           ("int8", "int8_float16", "float16", "float32"),
           help="显存紧张用 int8，质量优先用 float16"),
+    Field("whisper_batch_size", "转录批大小 batch", "转录", "int",
+          help="显存不足就调小；8GB 显存建议 4–8（不足会自动降批重试）"),
     Field("whisper_device", "推理设备", "转录", "choice", ("cuda", "cpu"), restart=True),
     Field("whisper_max_prompt_terms", "提示词最多注入词条数", "转录", "int"),
     Field("diarize_model", "说话人分离模型", "转录", "str",

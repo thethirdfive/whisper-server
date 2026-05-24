@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     diarize_model: str = "pyannote/speaker-diarization-community-1"
     whisper_device: Literal["cuda", "cpu"] = "cuda"
     whisper_compute_type: str = "int8"
+    whisper_batch_size: int = 8  # 转录批大小；显存不足会自动降批重试。8GB 显存建议 4–8
     whisper_max_prompt_terms: int = 80
 
     # === Google Drive ===

@@ -122,6 +122,24 @@ def _set_progress(db, job, *, progress=None, message=None, status=None, error=No
 # ---------------------------------------------------------------------------
 # 转录核心（惰性 import whisperx）
 # ---------------------------------------------------------------------------
+def _gpu_cleanup() -> None:
+    """显式回收显存（8GB 卡上，阶段间不释放会 OOM）。"""
+    import gc  # noqa: PLC0415
+
+    gc.collect()
+    try:
+        import torch  # noqa: PLC0415
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _is_oom(e: Exception) -> bool:
+    return "out of memory" in str(e).lower() or "CUDA failed" in str(e)
+
+
 def _load_align_transcribe(
     audio_path: str,
     language: str | None,
@@ -130,21 +148,44 @@ def _load_align_transcribe(
     model_name: str,
     device: str,
     compute_type: str,
+    batch_size: int = 8,
 ):
-    """ASR + 词级对齐。返回 (result, audio)；audio 复用给说话人分离。"""
+    """ASR + 词级对齐。返回 (result, audio)；audio 复用给说话人分离。
+
+    显存不足时自动把 batch_size 减半重试（直到 1），并在转录/对齐各阶段后释放显存，
+    以适配 8GB 显存的卡。
+    """
     import whisperx  # noqa: PLC0415  惰性导入，避免无 GPU 环境 import 失败
 
     lang = None if language in (None, "", "auto") else language
     asr_options = {"initial_prompt": initial_prompt} if initial_prompt else None
     log.info("whisperx_load_model", model=model_name, device=device,
-             compute_type=compute_type, lang=lang, prompt_len=len(initial_prompt or ""))
+             compute_type=compute_type, lang=lang, batch_size=batch_size,
+             prompt_len=len(initial_prompt or ""))
     model = whisperx.load_model(
         model_name, device, compute_type=compute_type,
         asr_options=asr_options, language=lang,
     )
     audio = whisperx.load_audio(audio_path)
-    result = model.transcribe(audio, batch_size=16, language=lang)
+
+    # 转录：显存不足则降批重试
+    bs = max(1, int(batch_size))
+    while True:
+        try:
+            result = model.transcribe(audio, batch_size=bs, language=lang)
+            break
+        except RuntimeError as e:
+            if not _is_oom(e) or bs <= 1:
+                raise
+            _gpu_cleanup()
+            new_bs = max(1, bs // 2)
+            log.warning("transcribe_oom_retry", old_batch=bs, new_batch=new_bs, error=str(e)[:120])
+            bs = new_bs
     language_code = result.get("language", lang or "zh")
+
+    # 释放 ASR 模型，给对齐/分离腾显存（8GB 卡必需）
+    del model
+    _gpu_cleanup()
 
     # 词级对齐（失败不致命，退化为段级时间戳）
     try:
@@ -153,8 +194,11 @@ def _load_align_transcribe(
             result["segments"], model_a, metadata, audio, device,
             return_char_alignments=False,
         )
+        del model_a
     except Exception as e:  # noqa: BLE001
         log.warning("align_failed", error=str(e), language=language_code)
+    finally:
+        _gpu_cleanup()
 
     result["language"] = language_code
     return result, audio
@@ -181,6 +225,8 @@ def _diarize(
     except Exception:  # noqa: BLE001  旧版本路径
         from whisperx import DiarizationPipeline  # type: ignore  # noqa: PLC0415
 
+    _gpu_cleanup()  # 分离前确保显存最大空闲（8GB 卡）
+
     # token 参数名随版本变化（新版 token / 旧版 use_auth_token）
     params = _inspect.signature(DiarizationPipeline.__init__).parameters
     diar_kwargs = {"model_name": model_name, "device": device}
@@ -200,6 +246,8 @@ def _diarize(
     diarize_segments = pipe(audio, **call_kwargs)
     result = whisperx.assign_word_speakers(diarize_segments, result)
     log.info("diarization_done", **call_kwargs)
+    del pipe
+    _gpu_cleanup()
     return result
 
 
@@ -213,6 +261,7 @@ def _transcribe_by_channels(
     model_name: str,
     device: str,
     compute_type: str,
+    batch_size: int = 8,
 ) -> dict:
     """按声道拆分：每个声道单独转录，声道号即说话人标签，再按时间合并。"""
     merged_segments: list[dict] = []
@@ -233,6 +282,7 @@ def _transcribe_by_channels(
         res, _ = _load_align_transcribe(
             str(ch_audio), language, initial_prompt,
             model_name=model_name, device=device, compute_type=compute_type,
+            batch_size=batch_size,
         )
         language_code = language_code or res.get("language")
         label = f"声道{c + 1}"
@@ -337,6 +387,7 @@ def process_meeting(meeting_id: int) -> dict:
         eff_model = str(settings_store.effective(db, "whisper_model"))
         eff_compute = str(settings_store.effective(db, "whisper_compute_type"))
         eff_device = str(settings_store.effective(db, "whisper_device"))
+        eff_batch = int(settings_store.effective(db, "whisper_batch_size"))
         eff_diar_model = str(settings_store.effective(db, "diarize_model"))
         hf_token = settings.hf_token
 
@@ -350,6 +401,7 @@ def process_meeting(meeting_id: int) -> dict:
             result = _transcribe_by_channels(
                 files, work_dir, max_channels, meeting.language, prompt,
                 model_name=eff_model, device=eff_device, compute_type=eff_compute,
+                batch_size=eff_batch,
             )
         else:
             if mode == "channels":
@@ -375,6 +427,7 @@ def process_meeting(meeting_id: int) -> dict:
             result, audio = _load_align_transcribe(
                 str(merged), meeting.language, prompt,
                 model_name=eff_model, device=eff_device, compute_type=eff_compute,
+                batch_size=eff_batch,
             )
 
             # 说话人分离（auto / count）
