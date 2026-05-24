@@ -5,15 +5,22 @@ from pathlib import Path
 
 import structlog
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from pydantic import BaseModel
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.auth import require_login
 from app.database import get_db
-from app.models import AudioFile, Job, Meeting, Scenario, Segment, Speaker, User
+from app.models import AudioFile, Deliverable, Job, Meeting, Scenario, Segment, Speaker, User
 from app.services import queue as queue_svc
+from app.services import reports as reports_svc
 from app.services import settings_store, storage
 from app.services.prompt import build_initial_prompt
 from app.templating import templates
@@ -410,6 +417,45 @@ def cancel_meeting(
     return {"ok": True}
 
 
+# ===========================================================================
+# 转录后整理：入队 + 查看 HTML 报告
+# ===========================================================================
+@router.post("/{meeting_id}/report/queue")
+def queue_report_route(
+    meeting_id: int,
+    user: User = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    meeting = db.get(Meeting, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="会议不存在")
+    if meeting.status != "transcribed":
+        return _redirect(f"/meetings/{meeting_id}?error=请先完成转录再整理")
+    reports_svc.queue_report(db, meeting)
+    return _redirect(f"/meetings/{meeting_id}?msg=已加入整理队列，整理器会按时生成报告")
+
+
+@router.get("/{meeting_id}/report/{deliverable_id}", response_class=HTMLResponse)
+def view_report(
+    meeting_id: int,
+    deliverable_id: int,
+    download: int = 0,
+    user: User = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    d = db.get(Deliverable, deliverable_id)
+    if not d or d.meeting_id != meeting_id or d.kind != "report":
+        raise HTTPException(status_code=404, detail="报告不存在")
+    if not Path(d.file_path).exists():
+        raise HTTPException(status_code=404, detail="报告文件丢失")
+    fname = f"report_{meeting_id}_{deliverable_id}.html"
+    return FileResponse(
+        d.file_path,
+        media_type="text/html",
+        filename=fname if download else None,
+    )
+
+
 @router.get("/{meeting_id}", response_class=HTMLResponse)
 def meeting_detail(
     meeting_id: int,
@@ -436,6 +482,11 @@ def meeting_detail(
     ).scalars().all()
     job = _latest_job(db, meeting_id)
     prompt_preview = build_initial_prompt(db, meeting)
+    reports = db.execute(
+        select(Deliverable)
+        .where(Deliverable.meeting_id == meeting_id, Deliverable.kind == "report")
+        .order_by(desc(Deliverable.id))
+    ).scalars().all()
 
     return templates.TemplateResponse(
         request,
@@ -448,6 +499,7 @@ def meeting_detail(
             "segments": segments,
             "job": job,
             "prompt_preview": prompt_preview,
+            "reports": reports,
             "msg": msg,
             "error": error,
         },

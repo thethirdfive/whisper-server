@@ -82,5 +82,44 @@
         <p class="text-sm text-slate-400">尚无转录内容。</p>
         {% endif %}
     </div>
+
+    <!-- 整理报告 -->
+    {% set rs_label = {"none":"未生成","queued":"待整理","processing":"整理中","done":"已生成","failed":"失败"} %}
+    {% set rs_color = {"none":"bg-slate-100 text-slate-500","queued":"bg-amber-50 text-amber-700","processing":"bg-blue-50 text-blue-700","done":"bg-green-50 text-green-700","failed":"bg-red-50 text-red-700"} %}
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">整理报告 / Report
+                <span class="ml-2 text-xs px-2 py-0.5 rounded {{ rs_color.get(meeting.report_status, 'bg-slate-100 text-slate-500') }}">{{ rs_label.get(meeting.report_status, meeting.report_status) }}</span>
+            </h2>
+            {% if meeting.status == "transcribed" and meeting.report_status in ["none", "done", "failed"] %}
+            <form method="post" action="/meetings/{{ meeting.id }}/report/queue">
+                <button class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-1.5 rounded-md">
+                    {{ "重新生成报告" if meeting.report_status == "done" else "生成报告" }}
+                </button>
+            </form>
+            {% endif %}
+        </div>
+
+        {% if meeting.report_status in ["queued", "processing"] %}
+        <p class="text-sm text-slate-400">已加入整理队列，整理器（Claude Code）会按时生成 HTML 报告，完成后 Bark 通知你。</p>
+        {% endif %}
+
+        {% if reports %}
+        <ul class="divide-y divide-slate-100 text-sm">
+            {% for r in reports %}
+            <li class="py-2 flex items-center justify-between">
+                <div>
+                    <a href="/meetings/{{ meeting.id }}/report/{{ r.id }}" target="_blank" class="text-blue-600 hover:underline font-medium">查看报告 #{{ r.id }}</a>
+                    <span class="text-xs text-slate-400 ml-2">{{ r.created_by }} · {{ r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "" }}</span>
+                    {% if r.note %}<p class="text-xs text-slate-500 mt-0.5">{{ r.note }}</p>{% endif %}
+                </div>
+                <a href="/meetings/{{ meeting.id }}/report/{{ r.id }}?download=1" class="text-xs text-slate-400 hover:text-slate-700">下载</a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% elif meeting.report_status == "none" and meeting.status == "transcribed" %}
+        <p class="text-sm text-slate-400">点「生成报告」加入整理队列。</p>
+        {% endif %}
+    </div>
 </div>
 {% endblock %}

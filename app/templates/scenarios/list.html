@@ -6,9 +6,14 @@
     <div>
         <h1 class="text-2xl font-bold">场景 / Scenarios</h1>
         <p class="text-sm text-slate-500 mt-1">
-            上传会议时选择场景，系统会自动把它关联的词库注入转录提示词（initial_prompt）。
+            上传会议时选择场景，系统会自动把它关联的词库注入转录提示词（initial_prompt）；
+            转录后整理时用该场景的整理模板生成报告。
         </p>
     </div>
+
+    {% if msg %}
+    <div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded">{{ msg }}</div>
+    {% endif %}
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         {% for s in scenarios %}
@@ -31,6 +36,11 @@
                     <span class="text-xs text-slate-400">无关联词库</span>
                     {% endfor %}
                 </div>
+            </div>
+            <div class="mt-3 pt-3 border-t border-slate-100">
+                <a href="/scenarios/{{ s.id }}/template" class="text-xs text-blue-600 hover:underline">
+                    📋 整理模板{% if s.id in custom_template_ids %}（已自定义）{% else %}（默认）{% endif %}
+                </a>
             </div>
         </div>
         {% else %}

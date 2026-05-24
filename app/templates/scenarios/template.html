@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}整理模板 - {{ scenario.name_zh }} - whisper-server{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto space-y-5">
+    <div>
+        <a href="/scenarios" class="text-sm text-slate-500 hover:text-slate-900">← 返回场景</a>
+        <h1 class="text-2xl font-bold mt-2">{{ scenario.icon or "🏷" }} {{ scenario.name_zh }} · 整理模板</h1>
+        <p class="text-sm text-slate-500 mt-1">
+            这段指令会和会议转录全文一起发给整理器（Claude Code），指导它生成本场景的 HTML 报告。
+            留空 = 用内置默认模板。
+        </p>
+    </div>
+
+    {% if saved %}
+    <div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded">已保存。</div>
+    {% endif %}
+
+    <form method="post" action="/scenarios/{{ scenario.id }}/template"
+          class="space-y-3 bg-white rounded-lg border border-slate-200 p-6">
+        <label class="block text-sm font-medium text-slate-700">
+            整理指令 / Instructions
+            {% if has_custom %}<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">已自定义</span>
+            {% else %}<span class="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500">用默认</span>{% endif %}
+        </label>
+        <textarea name="instructions" rows="16"
+                  placeholder="留空则使用下方内置默认模板"
+                  class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono leading-relaxed">{{ instructions }}</textarea>
+        <div class="flex items-center gap-3">
+            <button class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-md">保存</button>
+            {% if user.role != "admin" %}<span class="text-xs text-amber-600">仅管理员可保存</span>{% endif %}
+            <span class="text-xs text-slate-400">清空并保存 = 恢复默认</span>
+        </div>
+    </form>
+
+    <details class="bg-white rounded-lg border border-slate-200 p-4">
+        <summary class="cursor-pointer text-sm text-slate-600">查看内置默认模板</summary>
+        <pre class="mt-3 p-3 bg-slate-50 border border-slate-200 text-xs rounded whitespace-pre-wrap">{{ default_template }}</pre>
+    </details>
+</div>
+{% endblock %}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "whisper": {
+      "command": "/home/ai/whisper-server/.venv-mcp/bin/python",
+      "args": ["-m", "mcp_server.server"]
+    }
+  }
+}

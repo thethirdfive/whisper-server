@@ -156,6 +156,16 @@ whisper-server/
   - 刷新后用 localStorage 提示「重选文件续传」（浏览器无法持久化 File 对象）
   - CUDA OOM 修复：`whisper_batch_size` 可配（8GB 卡默认 4）+ OOM 自动降批 + 阶段间释放显存
 
+### ✅ 已完成 (Day 10)
+
+- 转录后整理（方案一：Claude Code + MCP）—— 见 [docs/organize-with-claude-code.md](docs/organize-with-claude-code.md)：
+  - 每场景一套**整理模板**（场景页可编辑，留空用内置默认），生成**HTML 报告**
+  - 会议详情页「生成报告」→ 进整理队列；报告可在线查看/下载；生成后 **Bark 通知**
+  - **MCP server**（`mcp_server/server.py`，stdio 直连同一 SQLite）：list_pending_reports /
+    get_meeting / claim_report / submit_report / report_failed
+  - `.mcp.json` + `.venv-mcp` 让本机 Claude Code 即插即用；用 `/schedule` 或 `/loop` 定期整理
+  - 整理器走 Claude Max 订阅，几乎零额外费用；方案二（LLM API）可复用同一队列/模板/产出
+
 ### 🚧 进行中 / 下一步
 
 - [ ] 场景↔词库关联在线编辑（设置项在线修改已完成）

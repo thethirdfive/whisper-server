@@ -15,6 +15,7 @@ htmlcov/
 # 虚拟环境
 .venv/
 .venv-test/
+.venv-mcp/
 venv/
 env/
 

@@ -10,6 +10,7 @@ from app.models.meeting import (
     Deliverable,
     Job,
     Meeting,
+    ReportTemplate,
     Segment,
     Speaker,
 )
@@ -38,5 +39,6 @@ __all__ = [
     "Segment",
     "ActionItem",
     "Deliverable",
+    "ReportTemplate",
     "Job",
 ]
