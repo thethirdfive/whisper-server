@@ -97,6 +97,9 @@ class AudioFile(Base):
     sample_rate: Mapped[int | None] = mapped_column(Integer)
     sequence: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     included: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=func.true())
+    # 分块上传状态：ready=已就绪(旧数据/直传) | uploading=分块上传中
+    upload_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="ready")
+    uploaded_bytes: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     source: Mapped[str] = mapped_column(String(32), nullable=False, server_default="upload")
     source_ref: Mapped[str | None] = mapped_column(Text)
     drive_file_id: Mapped[str | None] = mapped_column(String(128))

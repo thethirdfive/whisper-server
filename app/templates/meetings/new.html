@@ -13,7 +13,12 @@
     <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">{{ error }}</div>
     {% endif %}
 
-    <form method="post" action="/meetings" enctype="multipart/form-data" class="space-y-5 bg-white rounded-lg border border-slate-200 p-6">
+    <div id="upload-note" style="display:none"
+         class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded">
+        ✓ 已加入后台上传队列，进度见右下角。可继续上传下一场，或点顶部导航去其他页面（上传不中断）。
+    </div>
+
+    <form id="upload-form" method="post" action="/meetings" enctype="multipart/form-data" class="space-y-5 bg-white rounded-lg border border-slate-200 p-6">
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">标题 / Title *</label>
             <input name="title" required class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" />
@@ -131,6 +136,26 @@
         }
         sel.addEventListener("change", sync);
         sync();
+
+        // 提交：交给后台分块上传管理器（无 JS 管理器时回退普通整文件提交）
+        const form = document.getElementById("upload-form");
+        const val = (n) => { const e = form.querySelector('[name="' + n + '"]'); return e ? e.value : ""; };
+        form.addEventListener("submit", function (e) {
+            const fileInput = form.querySelector('input[name="files"]');
+            if (!window.uploadManager || !fileInput || !fileInput.files.length) return; // 回退
+            if (!val("title").trim()) return; // 让 required 生效
+            e.preventDefault();
+            window.uploadManager.addJob({
+                title: val("title").trim(), scenario_id: val("scenario_id"), language: val("language"),
+                company: val("company"), held_at: val("held_at"), tags: val("tags"),
+                custom_prompt: val("custom_prompt"), diarize_mode: val("diarize_mode"),
+                num_speakers: val("num_speakers"), min_speakers: val("min_speakers"), max_speakers: val("max_speakers"),
+            }, fileInput.files);
+            const note = document.getElementById("upload-note");
+            if (note) { note.style.display = ""; note.scrollIntoView({ behavior: "smooth", block: "center" }); }
+            form.reset();
+            sync();
+        });
     })();
 </script>
 {% endblock %}

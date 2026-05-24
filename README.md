@@ -145,6 +145,17 @@ whisper-server/
 - 设置页可在线编辑：运营类配置写入 `settings` 表，运行时**覆盖 .env**（app+worker 共用）；
   HF_TOKEN / 密钥等敏感项只读打码，写操作限管理员
 
+### ✅ 已完成 (Day 9)
+
+- 大文件上传重构（解决 WAN 上传卡死/无进度）：
+  - **分块断点续传**：每块 5MB（远小于 nginx `client_max_body_size`/超时），
+    `POST /meetings/draft` 建草稿 → `PUT .../chunk?offset=` 逐块（偏移不符 409 自动续传）
+    → `POST .../finalize` 入队；无 JS 时回退原整文件 POST
+  - **后台异步 + 进度托盘**：`static/upload.js` 全局上传管理器，右下角进度条/速度，
+    失败自动重试，可排队多场会议；导航用 htmx-boost 只换 `#page`，上传不中断
+  - 刷新后用 localStorage 提示「重选文件续传」（浏览器无法持久化 File 对象）
+  - CUDA OOM 修复：`whisper_batch_size` 可配（8GB 卡默认 4）+ OOM 自动降批 + 阶段间释放显存
+
 ### 🚧 进行中 / 下一步
 
 - [ ] 场景↔词库关联在线编辑（设置项在线修改已完成）
