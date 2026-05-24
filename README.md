@@ -135,9 +135,19 @@ whisper-server/
   env_file 插值损坏；`BACKUP_CRON_SCHEDULE` 未加引号致 `source .env` 报错；
   RQ 2.x 移除 `Connection`；Starlette 新版 `TemplateResponse` 签名
 
+### ✅ 已完成 (Day 8)
+
+- 说话人分离 4 种模式（上传时按场景选）：
+  - `channels` 按声道拆分 —— 双声道/每人一个麦的访谈、对话，**无需联网模型、离线可用**
+  - `auto` / `count` —— 同声道多人，用 pyannote 自动估计或指定人数（需 gated 模型）
+  - `off` 不分离
+  - 诊断脚本 `scripts/check_diarization.py` 检查 gated 模型是否就绪
+- 设置页可在线编辑：运营类配置写入 `settings` 表，运行时**覆盖 .env**（app+worker 共用）；
+  HF_TOKEN / 密钥等敏感项只读打码，写操作限管理员
+
 ### 🚧 进行中 / 下一步
 
-- [ ] 场景↔词库关联在线编辑、设置项在线修改（当前为只读展示）
+- [ ] 场景↔词库关联在线编辑（设置项在线修改已完成）
 - [ ] 全文搜索（FTS5；注意 unicode61 不切分中文，需 trigram/CJK tokenizer）
 - [ ] 说话人重命名、Word/产物导出
 - [ ] MCP server (Phase 3)
@@ -148,6 +158,37 @@ whisper-server/
 详见 [设计文档](docs/design.md)。
 
 ---
+
+## 说话人分离 (Speaker Diarization)
+
+上传会议时在「说话人分离」里选模式：
+
+| 模式 | 适用 | 是否需要联网模型 |
+|------|------|------------------|
+| 按声道拆分 `channels` | 立体声录音、每人占一个声道（双麦访谈、对话） | **否，离线可用** |
+| 自动估计人数 `auto` | 同一声道里多人说话 | 是（pyannote gated） |
+| 指定人数 `count` | 同上，已知人数/范围时更准 | 是（pyannote gated） |
+| 不分离 `off` | 单人录音 / 不需要区分 | 否 |
+
+### 让 pyannote gated 模型可用（auto / count 模式）
+
+`pyannote/speaker-diarization-community-1` 是 **gated（受限）模型**，必须先接受条款：
+
+1. 用 `.env` 里 `HF_TOKEN` 对应的 HuggingFace 账号登录；
+2. 打开 https://hf.co/pyannote/speaker-diarization-community-1 ，点 **Agree and access repository**；
+3. （可选）同样接受其依赖的 `pyannote/segmentation-3.0`、`pyannote/wespeaker-*` 等条款；
+4. 验证是否就绪：
+
+   ```bash
+   docker compose exec worker python scripts/check_diarization.py
+   ```
+
+   看到 `说话人分离已就绪 ✅` 即可。
+
+> ⚠️ 本部署 `HF_ENDPOINT=https://hf-mirror.com`（huggingface.co 被墙）。镜像对
+> gated 仓库支持不稳：若接受条款后仍下不动，可临时把 worker 的 `HF_ENDPOINT`
+> 改回 `https://huggingface.co` 拉一次模型（会缓存到 `HF_HOME`），或改用
+> **按声道拆分**（双声道录音完全不依赖这个模型）。
 
 ## 常用命令
 

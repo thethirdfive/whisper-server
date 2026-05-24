@@ -63,6 +63,42 @@
                       class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"></textarea>
         </div>
 
+        <!-- 说话人分离 -->
+        <div class="border border-slate-200 rounded-md p-4 space-y-3 bg-slate-50/50">
+            <label class="block text-sm font-medium text-slate-700">说话人分离 / Diarization</label>
+            <select name="diarize_mode" id="diarize_mode"
+                    class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white">
+                <option value="auto" selected>自动估计人数（同一声道内多人，需 pyannote 模型）</option>
+                <option value="count">指定人数（同一声道内多人）</option>
+                <option value="channels">按声道拆分（每人一个声道，如双声道访谈，无需联网模型）</option>
+                <option value="off">不分离（不区分说话人）</option>
+            </select>
+            <p class="text-xs text-slate-400">
+                · <b>按声道拆分</b>：录音为立体声、每个人占一个声道时最准，离线可用。<br>
+                · <b>自动/指定人数</b>：同一声道里多人说话时用，依赖 pyannote gated 模型（须在 HF 接受条款）。
+            </p>
+            <div id="speaker_count" class="hidden grid grid-cols-3 gap-3">
+                <div>
+                    <label class="block text-xs text-slate-500 mb-1">确切人数</label>
+                    <input type="number" name="num_speakers" min="1" max="20" placeholder="如 2"
+                           class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-500 mb-1">最少</label>
+                    <input type="number" name="min_speakers" min="1" max="20" placeholder="可选"
+                           class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-500 mb-1">最多</label>
+                    <input type="number" name="max_speakers" min="1" max="20" placeholder="可选"
+                           class="w-full px-2 py-1.5 border border-slate-300 rounded-md text-sm" />
+                </div>
+            </div>
+            <p id="speaker_count_hint" class="hidden text-xs text-slate-400">
+                填"确切人数"则忽略最少/最多；不确定就只填最少/最多范围。
+            </p>
+        </div>
+
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">文件 / Files *</label>
             <input type="file" name="files" multiple required
@@ -82,4 +118,19 @@
         </div>
     </form>
 </div>
+
+<script>
+    (function () {
+        const sel = document.getElementById("diarize_mode");
+        const box = document.getElementById("speaker_count");
+        const hint = document.getElementById("speaker_count_hint");
+        function sync() {
+            const show = sel.value === "count";
+            box.classList.toggle("hidden", !show);
+            hint.classList.toggle("hidden", !show);
+        }
+        sel.addEventListener("change", sync);
+        sync();
+    })();
+</script>
 {% endblock %}

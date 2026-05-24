@@ -2,6 +2,7 @@
 {% block title %}{{ meeting.title }} - 会议 - whisper-server{% endblock %}
 
 {% macro mmss(sec) %}{{ "%02d:%02d"|format((sec|int)//60, (sec|int)%60) }}{% endmacro %}
+{% set diarize_labels = {"off": "不分离", "auto": "自动估计人数", "count": "指定人数", "channels": "按声道拆分"} %}
 
 {% block content %}
 <div class="space-y-6">
@@ -23,6 +24,7 @@
                     {% if meeting.company %} · {{ meeting.company }}{% endif %}
                     · {{ meeting.held_at.strftime("%Y-%m-%d %H:%M") if meeting.held_at else "" }}
                     · {{ meeting.language }}
+                    · 🗣 {{ diarize_labels.get(meeting.diarize_mode, meeting.diarize_mode) }}{% if meeting.diarize_mode == "count" and meeting.num_speakers %} {{ meeting.num_speakers }}人{% endif %}
                 </p>
                 {% if meeting.tags %}<p class="text-xs text-slate-400 mt-1">🏷 {{ meeting.tags }}</p>{% endif %}
             </div>

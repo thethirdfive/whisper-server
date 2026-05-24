@@ -3,13 +3,14 @@
 在 worker 镜像内执行（含 ffmpeg / whisperx / CUDA）。whisperx 体积大且需要 GPU，
 故在函数内部惰性 import，保证本模块在无 whisperx 环境也能被 import（便于测试/入队）。
 
-流程：
-  1. 取 meeting + audio_files(included, 按 sequence)
-  2. 每个文件 ffprobe 取时长；视频抽音轨；统一转 16k 单声道 wav
-  3. 多文件 ffmpeg concat 合并成一条音轨
-  4. 由场景词库拼 initial_prompt
-  5. whisperx 转录 → 对齐 → 说话人分离
-  6. 写 speakers / segments，更新 meeting.status / duration_sec 与 job 进度
+说话人分离（meeting.diarize_mode）：
+  off       不分离，单声道混音，全部归一个说话人（不打标签）
+  auto      单声道混音 + pyannote 自动估计人数（需 HF_TOKEN 且已接受 gated 条款）
+  count     同 auto，但把 num/min/max_speakers 传给 pyannote 约束人数
+  channels  按声道拆分：每个声道单独转录，声道即说话人（无需 gated 模型，离线可用）
+            适合"每人一个麦"的访谈/对话；源必须是 ≥2 声道，否则回退 auto
+
+模型 / 精度 / 分离模型 取数据库有效值（设置页可改，覆盖 .env）；HF_TOKEN 仍只读 .env。
 """
 import json
 import shutil
@@ -24,6 +25,7 @@ from sqlalchemy import select
 from app.config import get_settings
 from app.database import SessionLocal
 from app.models import AudioFile, Job, Meeting, Segment, Speaker
+from app.services import settings_store
 from app.services.prompt import build_initial_prompt
 
 log = structlog.get_logger()
@@ -48,6 +50,23 @@ def _ffprobe_duration(path: str) -> float | None:
         return None
 
 
+def _ffprobe_channels(path: str) -> int | None:
+    """探测第一条音轨的声道数（用于判断能否按声道拆分）。"""
+    try:
+        out = subprocess.run(
+            [
+                "ffprobe", "-v", "error", "-select_streams", "a:0",
+                "-show_entries", "stream=channels", "-of", "json", path,
+            ],
+            check=True, capture_output=True, text=True,
+        )
+        streams = json.loads(out.stdout).get("streams", [])
+        return int(streams[0]["channels"]) if streams else None
+    except Exception as e:  # noqa: BLE001
+        log.warning("ffprobe_channels_failed", path=path, error=str(e))
+        return None
+
+
 def _to_wav16k(src: str, dst: Path) -> None:
     """转 16kHz 单声道 wav（whisper 标准输入）。视频会自动只取音轨。"""
     subprocess.run(
@@ -55,6 +74,18 @@ def _to_wav16k(src: str, dst: Path) -> None:
             "ffmpeg", "-y", "-i", src,
             "-vn", "-ac", "1", "-ar", "16000",
             "-c:a", "pcm_s16le", str(dst),
+        ],
+        check=True, capture_output=True,
+    )
+
+
+def _extract_channel(src: str, ch_index: int, dst: Path) -> None:
+    """抽取指定声道为 16kHz 单声道 wav（视频自动取音轨）。"""
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-i", src, "-vn",
+            "-af", f"pan=mono|c0=c{ch_index}",
+            "-ar", "16000", "-c:a", "pcm_s16le", str(dst),
         ],
         check=True, capture_output=True,
     )
@@ -91,18 +122,24 @@ def _set_progress(db, job, *, progress=None, message=None, status=None, error=No
 # ---------------------------------------------------------------------------
 # 转录核心（惰性 import whisperx）
 # ---------------------------------------------------------------------------
-def _transcribe(audio_path: str, language: str | None, initial_prompt: str) -> dict:
+def _load_align_transcribe(
+    audio_path: str,
+    language: str | None,
+    initial_prompt: str,
+    *,
+    model_name: str,
+    device: str,
+    compute_type: str,
+):
+    """ASR + 词级对齐。返回 (result, audio)；audio 复用给说话人分离。"""
     import whisperx  # noqa: PLC0415  惰性导入，避免无 GPU 环境 import 失败
 
-    device = settings.whisper_device
-    compute_type = settings.whisper_compute_type
     lang = None if language in (None, "", "auto") else language
-
     asr_options = {"initial_prompt": initial_prompt} if initial_prompt else None
-    log.info("whisperx_load_model", model=settings.whisper_model, device=device,
+    log.info("whisperx_load_model", model=model_name, device=device,
              compute_type=compute_type, lang=lang, prompt_len=len(initial_prompt or ""))
     model = whisperx.load_model(
-        settings.whisper_model, device, compute_type=compute_type,
+        model_name, device, compute_type=compute_type,
         asr_options=asr_options, language=lang,
     )
     audio = whisperx.load_audio(audio_path)
@@ -119,30 +156,93 @@ def _transcribe(audio_path: str, language: str | None, initial_prompt: str) -> d
     except Exception as e:  # noqa: BLE001
         log.warning("align_failed", error=str(e), language=language_code)
 
-    # 说话人分离（需要 HF token；失败不致命，退化为无说话人）
-    if settings.hf_token:
-        try:
-            import inspect as _inspect
-
-            try:
-                from whisperx.diarize import DiarizationPipeline
-            except Exception:  # noqa: BLE001  旧版本路径
-                from whisperx import DiarizationPipeline  # type: ignore
-            # token 参数名随版本变化（新版 token / 旧版 use_auth_token）
-            diar_kwargs = {"model_name": settings.diarize_model, "device": device}
-            params = _inspect.signature(DiarizationPipeline.__init__).parameters
-            diar_kwargs["token" if "token" in params else "use_auth_token"] = settings.hf_token
-            diarize_model = DiarizationPipeline(**diar_kwargs)
-            diarize_segments = diarize_model(audio)
-            result = whisperx.assign_word_speakers(diarize_segments, result)
-            log.info("diarization_done")
-        except Exception as e:  # noqa: BLE001
-            log.warning("diarization_failed", error=str(e))
-    else:
-        log.warning("diarization_skipped_no_hf_token")
-
     result["language"] = language_code
+    return result, audio
+
+
+def _diarize(
+    audio,
+    result: dict,
+    *,
+    model_name: str,
+    device: str,
+    hf_token: str,
+    num_speakers: int | None,
+    min_speakers: int | None,
+    max_speakers: int | None,
+) -> dict:
+    """pyannote 说话人分离，把 speaker 标签贴回每个词/段。需 gated 模型已可下载。"""
+    import inspect as _inspect  # noqa: PLC0415
+
+    import whisperx  # noqa: PLC0415
+
+    try:
+        from whisperx.diarize import DiarizationPipeline  # noqa: PLC0415
+    except Exception:  # noqa: BLE001  旧版本路径
+        from whisperx import DiarizationPipeline  # type: ignore  # noqa: PLC0415
+
+    # token 参数名随版本变化（新版 token / 旧版 use_auth_token）
+    params = _inspect.signature(DiarizationPipeline.__init__).parameters
+    diar_kwargs = {"model_name": model_name, "device": device}
+    diar_kwargs["token" if "token" in params else "use_auth_token"] = hf_token
+    pipe = DiarizationPipeline(**diar_kwargs)
+
+    # 人数约束：指定确切人数优先，否则给 min/max 范围
+    call_kwargs: dict[str, int] = {}
+    if num_speakers:
+        call_kwargs["num_speakers"] = int(num_speakers)
+    else:
+        if min_speakers:
+            call_kwargs["min_speakers"] = int(min_speakers)
+        if max_speakers:
+            call_kwargs["max_speakers"] = int(max_speakers)
+
+    diarize_segments = pipe(audio, **call_kwargs)
+    result = whisperx.assign_word_speakers(diarize_segments, result)
+    log.info("diarization_done", **call_kwargs)
     return result
+
+
+def _transcribe_by_channels(
+    files: list[AudioFile],
+    work_dir: Path,
+    channels: int,
+    language: str | None,
+    initial_prompt: str,
+    *,
+    model_name: str,
+    device: str,
+    compute_type: str,
+) -> dict:
+    """按声道拆分：每个声道单独转录，声道号即说话人标签，再按时间合并。"""
+    merged_segments: list[dict] = []
+    language_code: str | None = None
+
+    for c in range(channels):
+        ch_wavs: list[Path] = []
+        for af in files:
+            chw = work_dir / f"{af.sequence:02d}_ch{c}.wav"
+            _extract_channel(af.file_path, c, chw)
+            ch_wavs.append(chw)
+        if len(ch_wavs) == 1:
+            ch_audio = ch_wavs[0]
+        else:
+            ch_audio = work_dir / f"merged_ch{c}.wav"
+            _concat_wavs(ch_wavs, ch_audio, work_dir)
+
+        res, _ = _load_align_transcribe(
+            str(ch_audio), language, initial_prompt,
+            model_name=model_name, device=device, compute_type=compute_type,
+        )
+        language_code = language_code or res.get("language")
+        label = f"声道{c + 1}"
+        for seg in res.get("segments", []):
+            if (seg.get("text") or "").strip():
+                seg["speaker"] = label
+                merged_segments.append(seg)
+
+    merged_segments.sort(key=lambda s: float(s.get("start") or 0.0))
+    return {"segments": merged_segments, "language": language_code or "zh"}
 
 
 def _write_results(db, meeting: Meeting, result: dict) -> int:
@@ -219,38 +319,84 @@ def process_meeting(meeting_id: int) -> dict:
             shutil.rmtree(work_dir, ignore_errors=True)
         work_dir.mkdir(parents=True, exist_ok=True)
 
-        # 1. 抽轨 + 统一转 wav，顺带回填时长/媒体信息
-        wavs: list[Path] = []
+        # 1. 探测每个文件：时长 + 声道数（回填媒体信息）
         total_dur = 0.0
+        max_channels = 1
         for af in files:
             dur = _ffprobe_duration(af.file_path)
             if dur:
                 af.duration_sec = int(dur)
                 total_dur += dur
-            wav = work_dir / f"{af.sequence:02d}.wav"
-            _to_wav16k(af.file_path, wav)
-            if af.media_kind == "video":
-                af.extracted_audio_path = str(wav)
-            wavs.append(wav)
+            ch = _ffprobe_channels(af.file_path)
+            if ch:
+                af.channels = ch
+                max_channels = max(max_channels, ch)
         db.commit()
-        _set_progress(db, job, progress=15, message="音频合并")
 
-        # 2. 合并
-        if len(wavs) == 1:
-            merged = wavs[0]
-        else:
-            merged = work_dir / "merged.wav"
-            _concat_wavs(wavs, merged, work_dir)
+        # 有效配置（DB 覆盖 .env）；HF_TOKEN 仍只读 .env
+        eff_model = str(settings_store.effective(db, "whisper_model"))
+        eff_compute = str(settings_store.effective(db, "whisper_compute_type"))
+        eff_device = str(settings_store.effective(db, "whisper_device"))
+        eff_diar_model = str(settings_store.effective(db, "diarize_model"))
+        hf_token = settings.hf_token
 
-        # 3. prompt
+        mode = (meeting.diarize_mode or "auto").lower()
         prompt = build_initial_prompt(db, meeting)
-        _set_progress(db, job, progress=25, message="加载模型并转录")
 
-        # 4. 转录
-        result = _transcribe(str(merged), meeting.language, prompt)
+        # 2. 转录（按模式分派）
+        if mode == "channels" and max_channels >= 2:
+            _set_progress(db, job, progress=25,
+                          message=f"按 {max_channels} 声道分轨转录")
+            result = _transcribe_by_channels(
+                files, work_dir, max_channels, meeting.language, prompt,
+                model_name=eff_model, device=eff_device, compute_type=eff_compute,
+            )
+        else:
+            if mode == "channels":
+                log.warning("channel_mode_needs_stereo_fallback", channels=max_channels)
+            # 单声道混音
+            wavs: list[Path] = []
+            for af in files:
+                wav = work_dir / f"{af.sequence:02d}.wav"
+                _to_wav16k(af.file_path, wav)
+                if af.media_kind == "video":
+                    af.extracted_audio_path = str(wav)
+                wavs.append(wav)
+            db.commit()
+            _set_progress(db, job, progress=15, message="音频合并")
+
+            if len(wavs) == 1:
+                merged = wavs[0]
+            else:
+                merged = work_dir / "merged.wav"
+                _concat_wavs(wavs, merged, work_dir)
+
+            _set_progress(db, job, progress=25, message="加载模型并转录")
+            result, audio = _load_align_transcribe(
+                str(merged), meeting.language, prompt,
+                model_name=eff_model, device=eff_device, compute_type=eff_compute,
+            )
+
+            # 说话人分离（auto / count）
+            if mode in ("auto", "count"):
+                if hf_token:
+                    _set_progress(db, job, progress=70, message="说话人分离")
+                    try:
+                        result = _diarize(
+                            audio, result,
+                            model_name=eff_diar_model, device=eff_device, hf_token=hf_token,
+                            num_speakers=meeting.num_speakers if mode == "count" else None,
+                            min_speakers=meeting.min_speakers if mode == "count" else None,
+                            max_speakers=meeting.max_speakers if mode == "count" else None,
+                        )
+                    except Exception as e:  # noqa: BLE001  分离失败不致命，退化为无说话人
+                        log.warning("diarization_failed", error=str(e))
+                else:
+                    log.warning("diarization_skipped_no_hf_token")
+
         _set_progress(db, job, progress=85, message="写入转录结果")
 
-        # 5. 落库
+        # 3. 落库
         n = _write_results(db, meeting, result)
 
         meeting.status = "transcribed"
@@ -266,7 +412,7 @@ def process_meeting(meeting_id: int) -> dict:
         # 清理中间文件
         shutil.rmtree(work_dir, ignore_errors=True)
 
-        log.info("process_meeting_done", meeting_id=meeting_id, segments=n)
+        log.info("process_meeting_done", meeting_id=meeting_id, segments=n, mode=mode)
         return {"meeting_id": meeting_id, "status": "transcribed", "segments": n}
 
     except Exception as e:  # noqa: BLE001

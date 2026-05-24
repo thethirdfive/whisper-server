@@ -8,8 +8,8 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.config import get_settings
 from app.models import Meeting, ScenarioVocabulary, VocabularyTerm
+from app.services import settings_store
 
 
 def scenario_terms(db: Session, scenario_id: int, limit: int) -> list[str]:
@@ -37,8 +37,9 @@ def scenario_terms(db: Session, scenario_id: int, limit: int) -> list[str]:
 
 
 def build_initial_prompt(db: Session, meeting: Meeting, max_terms: int | None = None) -> str:
-    settings = get_settings()
-    limit = max_terms if max_terms is not None else settings.whisper_max_prompt_terms
+    limit = max_terms if max_terms is not None else int(
+        settings_store.effective(db, "whisper_max_prompt_terms")
+    )
 
     terms: list[str] = []
     if meeting.scenario_id:

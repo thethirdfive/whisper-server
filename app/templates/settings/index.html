@@ -5,18 +5,21 @@
 <div class="space-y-6">
     <h1 class="text-2xl font-bold">设置 / Settings</h1>
 
-    <!-- 系统 -->
+    {% if saved %}
+    <div class="p-3 bg-green-50 border border-green-200 text-green-700 text-sm rounded">已保存。部分项（设备 / 看守目录 / 日志级别）需重启容器后生效。</div>
+    {% endif %}
+    {% if error %}
+    <div class="p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded">{{ error }}</div>
+    {% endif %}
+
+    <!-- 系统信息（只读） -->
     <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
         <h2 class="font-semibold mb-4">系统 / System</h2>
         <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 text-sm">
             <div><dt class="text-slate-400">环境 env</dt><dd class="font-mono">{{ settings.app_env }}</dd></div>
             <div><dt class="text-slate-400">公网地址</dt><dd class="font-mono break-all">{{ settings.app_public_url }}</dd></div>
-            <div><dt class="text-slate-400">默认语言</dt><dd class="font-mono">{{ settings.app_default_locale }}</dd></div>
             <div><dt class="text-slate-400">时区</dt><dd class="font-mono">{{ settings.app_timezone }}</dd></div>
-            <div><dt class="text-slate-400">Whisper 模型</dt><dd class="font-mono">{{ settings.whisper_model }}</dd></div>
-            <div><dt class="text-slate-400">计算精度</dt><dd class="font-mono">{{ settings.whisper_compute_type }}</dd></div>
-            <div><dt class="text-slate-400">设备 device</dt><dd class="font-mono">{{ settings.whisper_device }}</dd></div>
-            <div class="md:col-span-2"><dt class="text-slate-400">说话人分离模型</dt><dd class="font-mono break-all">{{ settings.diarize_model }}</dd></div>
+            <div><dt class="text-slate-400">推理设备</dt><dd class="font-mono">{{ values.whisper_device }}</dd></div>
             <div><dt class="text-slate-400">版本</dt><dd class="font-mono">v{{ app_version }}</dd></div>
         </dl>
     </div>
@@ -32,32 +35,77 @@
         </div>
     </div>
 
-    <!-- 设置表 -->
+    <!-- 可编辑配置 -->
+    <form method="post" action="/settings" class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 space-y-6">
+        <div class="flex items-center justify-between">
+            <h2 class="font-semibold">运营配置 / Settings</h2>
+            <span class="text-xs text-slate-400">改这里的值会写入数据库并覆盖 .env</span>
+        </div>
+
+        {% for group, fields in groups.items() %}
+        <div>
+            <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">{{ group }}</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                {% for f in fields %}
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">
+                        {{ f.label }}
+                        {% if f.key in overridden %}<span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 align-middle">已改</span>{% endif %}
+                        {% if f.restart %}<span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 align-middle">需重启</span>{% endif %}
+                    </label>
+
+                    {% if f.type == "choice" %}
+                    <select name="{{ f.key }}" class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm bg-white">
+                        {% for c in f.choices %}
+                        <option value="{{ c }}" {% if values[f.key]|string == c %}selected{% endif %}>{{ c }}</option>
+                        {% endfor %}
+                    </select>
+                    {% elif f.type == "bool" %}
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                        <input type="checkbox" name="{{ f.key }}" value="true" {% if values[f.key] %}checked{% endif %}
+                               class="rounded border-slate-300" />
+                        启用
+                    </label>
+                    {% elif f.type == "int" %}
+                    <input type="number" name="{{ f.key }}" value="{{ values[f.key] }}"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm" />
+                    {% else %}
+                    <input type="text" name="{{ f.key }}" value="{{ values[f.key] }}"
+                           class="w-full px-3 py-2 border border-slate-300 rounded-md text-sm font-mono" />
+                    {% endif %}
+
+                    {% if f.help %}<p class="text-xs text-slate-400 mt-1">{{ f.help }}</p>{% endif %}
+                    <p class="text-[10px] text-slate-300 font-mono mt-0.5">{{ f.key }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="flex items-center gap-3 pt-2 border-t border-slate-100">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2 rounded-md text-sm">
+                保存设置
+            </button>
+            {% if user.role != "admin" %}
+            <span class="text-xs text-amber-600">仅管理员可保存</span>
+            {% endif %}
+        </div>
+    </form>
+
+    <!-- 敏感项（只读） -->
     <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
         <div class="flex items-center justify-between mb-4">
-            <h2 class="font-semibold">应用设置项 / Settings</h2>
-            <span class="text-xs text-slate-400">当前运行配置以 .env 为准，此表为预留入口（只读）</span>
+            <h2 class="font-semibold">密钥 / Secrets</h2>
+            <span class="text-xs text-slate-400">只读，仅在 .env 中配置</span>
         </div>
-        <div class="overflow-x-auto">
-            <table class="w-full text-sm">
-                <thead>
-                    <tr class="text-left text-slate-400 border-b border-slate-200">
-                        <th class="py-2 pr-3">Key</th><th class="py-2 pr-3">Value</th><th class="py-2">说明</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for r in rows %}
-                    <tr class="border-b border-slate-100">
-                        <td class="py-2 pr-3 font-mono text-xs whitespace-nowrap">{{ r.key }}</td>
-                        <td class="py-2 pr-3 font-mono text-xs">{{ r.value }}</td>
-                        <td class="py-2 text-slate-500">{{ r.description or "" }}</td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="3" class="py-3 text-slate-400">无</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+        <dl class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 text-sm">
+            {% for s in sensitive %}
+            <div>
+                <dt class="text-slate-400">{{ s.label }}</dt>
+                <dd class="font-mono">{{ s.masked }} <span class="text-[10px] text-slate-300">{{ s.key }}</span></dd>
+            </div>
+            {% endfor %}
+        </dl>
     </div>
 
     <!-- 账号 -->

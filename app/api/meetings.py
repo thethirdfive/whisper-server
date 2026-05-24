@@ -10,17 +10,15 @@ from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.auth import require_login
-from app.config import get_settings
 from app.database import get_db
 from app.models import AudioFile, Job, Meeting, Scenario, Segment, Speaker, User
 from app.services import queue as queue_svc
-from app.services import storage
+from app.services import settings_store, storage
 from app.services.prompt import build_initial_prompt
 from app.templating import templates
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 log = structlog.get_logger()
-settings = get_settings()
 
 CHUNK = 1024 * 1024
 TERMINAL = {"transcribed", "failed"}
@@ -70,6 +68,7 @@ def new_meeting(
     error: str | None = None,
 ):
     scenarios = db.execute(select(Scenario).order_by(Scenario.sort_order, Scenario.id)).scalars().all()
+    max_mb, audio_set, video_set = settings_store.effective_upload(db)
     return templates.TemplateResponse(
         request,
         "meetings/new.html",
@@ -77,9 +76,9 @@ def new_meeting(
             "user": user,
             "scenarios": scenarios,
             "error": error,
-            "allowed_audio": sorted(settings.allowed_audio_set),
-            "allowed_video": sorted(settings.allowed_video_set),
-            "max_size_mb": settings.upload_max_size_mb,
+            "allowed_audio": sorted(audio_set),
+            "allowed_video": sorted(video_set),
+            "max_size_mb": max_mb,
         },
     )
 
@@ -95,6 +94,10 @@ async def create_meeting(
     language: str = Form("zh"),
     tags: str = Form(""),
     custom_prompt: str = Form(""),
+    diarize_mode: str = Form("auto"),
+    num_speakers: str = Form(""),
+    min_speakers: str = Form(""),
+    max_speakers: str = Form(""),
     files: list[UploadFile] = File(default=[]),
 ):
     title = title.strip()
@@ -104,14 +107,25 @@ async def create_meeting(
     if not files:
         return _redirect("/meetings/new?error=请至少选择一个音频或视频文件")
 
+    # 上传限制取数据库有效值（设置页可改）
+    max_mb, audio_set, video_set = settings_store.effective_upload(db)
+    allowed = audio_set | video_set
+
     # 扩展名校验（保存前）
-    allowed = settings.allowed_extensions
     for f in files:
         ext = Path(f.filename).suffix.lower().lstrip(".")
         if ext not in allowed:
             return _redirect(f"/meetings/new?error=不支持的文件类型：.{ext}")
 
     sid = int(scenario_id) if scenario_id.strip().isdigit() else None
+
+    mode = diarize_mode.strip().lower()
+    if mode not in ("off", "auto", "count", "channels"):
+        mode = "auto"
+
+    def _opt_int(raw: str) -> int | None:
+        raw = raw.strip()
+        return int(raw) if raw.isdigit() and int(raw) > 0 else None
 
     meeting = Meeting(
         title=title,
@@ -122,12 +136,16 @@ async def create_meeting(
         language=(language.strip() or "zh")[:8],
         status="uploaded",
         custom_prompt=custom_prompt.strip() or None,
+        diarize_mode=mode,
+        num_speakers=_opt_int(num_speakers) if mode == "count" else None,
+        min_speakers=_opt_int(min_speakers) if mode == "count" else None,
+        max_speakers=_opt_int(max_speakers) if mode == "count" else None,
         owner_id=user.id,
     )
     db.add(meeting)
     db.flush()  # 拿到 meeting.id 但还没提交
 
-    budget = settings.upload_max_size_mb * 1024 * 1024
+    budget = max_mb * 1024 * 1024
     used = 0
     dest_dir = storage.meeting_recordings_dir(meeting.id)
     try:
@@ -151,7 +169,7 @@ async def create_meeting(
                     meeting_id=meeting.id,
                     file_path=str(dest),
                     original_name=up.filename,
-                    media_kind="video" if ext in settings.allowed_video_set else "audio",
+                    media_kind="video" if ext in video_set else "audio",
                     size_bytes=size,
                     sequence=seq,
                     source="upload",
@@ -160,7 +178,7 @@ async def create_meeting(
     except ValueError:
         db.rollback()
         shutil.rmtree(dest_dir, ignore_errors=True)
-        return _redirect(f"/meetings/new?error=总大小超过上限 {settings.upload_max_size_mb}MB")
+        return _redirect(f"/meetings/new?error=总大小超过上限 {max_mb}MB")
     except Exception as e:  # noqa: BLE001
         log.error("upload_save_failed", error=str(e), meeting_title=title)
         db.rollback()
