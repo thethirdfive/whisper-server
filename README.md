@@ -172,23 +172,36 @@ whisper-server/
 
 ### 让 pyannote gated 模型可用（auto / count 模式）
 
-`pyannote/speaker-diarization-community-1` 是 **gated（受限）模型**，必须先接受条款：
+`pyannote/speaker-diarization-community-1` 是 **gated（受限）模型**，要用 auto/count
+需满足两点：
 
-1. 用 `.env` 里 `HF_TOKEN` 对应的 HuggingFace 账号登录；
-2. 打开 https://hf.co/pyannote/speaker-diarization-community-1 ，点 **Agree and access repository**；
-3. （可选）同样接受其依赖的 `pyannote/segmentation-3.0`、`pyannote/wespeaker-*` 等条款；
-4. 验证是否就绪：
+1. **接受条款**：用 `.env` 里 `HF_TOKEN` 对应的 HuggingFace 账号登录，打开
+   https://hf.co/pyannote/speaker-diarization-community-1 点 **Agree and access repository**。
+2. **能下到文件**：本部署默认 `HF_ENDPOINT=https://hf-mirror.com`，但**镜像不给下
+   gated 仓库的权重文件**（实测：元数据能读、文件下不动）。所以 worker 需要走能直连
+   huggingface.co 的网络。
 
-   ```bash
-   docker compose exec worker python scripts/check_diarization.py
-   ```
+本机的做法（已配置）——让 **worker 经本机 mihomo 代理直连真 huggingface.co**：
 
-   看到 `说话人分离已就绪 ✅` 即可。
+```ini
+# .env（仅 worker 生效，见 docker-compose.yml 的 environment 段）
+WORKER_HF_ENDPOINT=https://huggingface.co
+WORKER_HF_PROXY=http://host.docker.internal:7890   # 本机代理端口
+```
 
-> ⚠️ 本部署 `HF_ENDPOINT=https://hf-mirror.com`（huggingface.co 被墙）。镜像对
-> gated 仓库支持不稳：若接受条款后仍下不动，可临时把 worker 的 `HF_ENDPOINT`
-> 改回 `https://huggingface.co` 拉一次模型（会缓存到 `HF_HOME`），或改用
-> **按声道拆分**（双声道录音完全不依赖这个模型）。
+> compose 里 worker 已加 `extra_hosts: host.docker.internal:host-gateway`，让容器能
+> 通过该名字访问宿主机（容器 DNS 会被透明代理 fake-ip 劫持，故用 extra_hosts 固定）。
+> 不需要代理的环境把这两个变量留空即可，worker 自动回退到 `hf-mirror.com`。
+
+配好后模型会缓存到 `HF_HOME=/data/whisper/models/hf`（持久化卷），之后即使代理不在也能
+从缓存加载。验证：
+
+```bash
+docker compose exec worker python scripts/check_diarization.py
+# 看到 “说话人分离已就绪 ✅” 即可
+```
+
+> 实在没有可用代理 → 直接用 **按声道拆分** 模式（双声道录音完全不依赖这个模型）。
 
 ## 常用命令
 
