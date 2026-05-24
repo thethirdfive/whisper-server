@@ -3,12 +3,18 @@
 
 FROM python:3.11-slim AS base
 
-# 基础系统依赖
+# 基础系统依赖（含 weasyprint 渲染 PDF 所需的 pango/cairo + 中文字体）
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
         ca-certificates \
         sqlite3 \
         gettext \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libharfbuzz0b \
+        libfontconfig1 \
+        libcairo2 \
+        fonts-wqy-zenhei \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -38,7 +44,8 @@ RUN uv pip install --system --no-cache \
         "httpx>=0.27.0" \
         "python-dotenv>=1.0.1" \
         "structlog>=24.4.0" \
-        "tenacity>=9.0.0"
+        "tenacity>=9.0.0" \
+        "weasyprint>=62.0"
 
 # 复制应用代码
 COPY app/ /app/app/

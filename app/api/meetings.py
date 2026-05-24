@@ -1,4 +1,5 @@
 """会议列表 / 上传向导 / 详情 / 状态轮询 / 分块断点续传"""
+import logging as _logging
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -39,6 +40,10 @@ from app.templating import templates
 
 router = APIRouter(prefix="/meetings", tags=["meetings"])
 log = structlog.get_logger()
+
+# weasyprint/fontTools 渲染 PDF 时会刷大量 DEBUG 日志，降噪
+_logging.getLogger("fontTools").setLevel(_logging.WARNING)
+_logging.getLogger("weasyprint").setLevel(_logging.WARNING)
 
 CHUNK = 1024 * 1024
 TERMINAL = {"transcribed", "failed"}
@@ -659,6 +664,42 @@ def view_report(
         d.file_path,
         media_type="text/html",
         filename=fname if download else None,
+    )
+
+
+@router.get("/{meeting_id}/report/{deliverable_id}/pdf")
+def report_pdf(
+    meeting_id: int,
+    deliverable_id: int,
+    user: User = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    """服务端用 weasyprint 把 HTML 报告渲染成 PDF（一键下载）。
+
+    渲染失败（如缺系统库/字体）则回退到浏览器打印另存（?pdf=1）。
+    """
+    d = db.get(Deliverable, deliverable_id)
+    if not d or d.meeting_id != meeting_id or d.kind != "report":
+        raise HTTPException(status_code=404, detail="报告不存在")
+    p = Path(d.file_path)
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="报告文件丢失")
+    try:
+        from weasyprint import HTML  # noqa: PLC0415  惰性导入（依赖系统库）
+
+        pdf = HTML(
+            string=p.read_text(encoding="utf-8", errors="replace"), base_url=str(p.parent)
+        ).write_pdf()
+    except Exception as e:  # noqa: BLE001
+        log.error("pdf_render_failed", meeting_id=meeting_id, error=str(e))
+        return RedirectResponse(
+            f"/meetings/{meeting_id}/report/{deliverable_id}?pdf=1",
+            status_code=status.HTTP_302_FOUND,
+        )
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="report_{meeting_id}_{deliverable_id}.pdf"'},
     )
 
 
