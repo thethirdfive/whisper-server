@@ -58,38 +58,7 @@
         </ul>
     </div>
 
-    <!-- 转录文本 -->
-    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-        <div class="flex items-center justify-between mb-3">
-            <h2 class="font-semibold">转录 / Transcript</h2>
-            {% if segments %}
-            <a href="/meetings/{{ meeting.id }}/transcript.txt"
-               class="text-xs border border-slate-200 rounded-md px-3 py-1.5 hover:bg-slate-50">⬇ 导出 TXT</a>
-            {% endif %}
-        </div>
-        {% if segments %}
-        <div class="space-y-3">
-            {% for s in segments %}
-            {% set sp = speakers.get(s.speaker_id) %}
-            <div id="seg-{{ s.id }}" class="seg flex gap-3 text-sm rounded-md -mx-2 px-2 py-0.5">
-                <span class="text-xs text-slate-400 font-mono whitespace-nowrap pt-0.5">{{ mmss(s.start_sec) }}</span>
-                <div>
-                    {% if sp %}<span class="font-medium text-slate-700">{{ sp.display_name or sp.label }}</span>{% endif %}
-                    <span class="text-slate-800">{{ s.text }}</span>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% elif meeting.status in ["queued", "processing"] %}
-        <p class="text-sm text-slate-400">转录进行中，完成后自动显示。</p>
-        {% elif meeting.status == "failed" %}
-        <p class="text-sm text-red-500">转录失败，详见上方错误信息。</p>
-        {% else %}
-        <p class="text-sm text-slate-400">尚无转录内容。</p>
-        {% endif %}
-    </div>
-
-    <!-- 整理报告 -->
+    <!-- 整理报告（上移到转录之上，方便直接操作） -->
     {% set rs_label = {"none":"未生成","queued":"待整理","processing":"整理中","done":"已生成","failed":"失败"} %}
     {% set rs_color = {"none":"bg-slate-100 text-slate-500","queued":"bg-amber-50 text-amber-700","processing":"bg-blue-50 text-blue-700","done":"bg-green-50 text-green-700","failed":"bg-red-50 text-red-700"} %}
     <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
@@ -128,6 +97,37 @@
         </ul>
         {% elif meeting.report_status == "none" and meeting.status == "transcribed" %}
         <p class="text-sm text-slate-400">点「生成报告」加入整理队列。</p>
+        {% endif %}
+    </div>
+
+    <!-- 转录文本 -->
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">转录 / Transcript</h2>
+            {% if segments %}
+            <a href="/meetings/{{ meeting.id }}/transcript.txt"
+               class="text-xs border border-slate-200 rounded-md px-3 py-1.5 hover:bg-slate-50">⬇ 导出 TXT</a>
+            {% endif %}
+        </div>
+        {% if segments %}
+        <div class="space-y-3">
+            {% for s in segments %}
+            {% set sp = speakers.get(s.speaker_id) %}
+            <div id="seg-{{ s.id }}" class="seg flex gap-3 text-sm rounded-md -mx-2 px-2 py-0.5">
+                <span class="text-xs text-slate-400 font-mono whitespace-nowrap pt-0.5">{{ mmss(s.start_sec) }}</span>
+                <div>
+                    {% if sp %}<span class="font-medium text-slate-700">{{ sp.display_name or sp.label }}</span>{% endif %}
+                    <span class="text-slate-800">{{ s.text }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif meeting.status in ["queued", "processing"] %}
+        <p class="text-sm text-slate-400">转录进行中，完成后自动显示。</p>
+        {% elif meeting.status == "failed" %}
+        <p class="text-sm text-red-500">转录失败，详见上方错误信息。</p>
+        {% else %}
+        <p class="text-sm text-slate-400">尚无转录内容。</p>
         {% endif %}
     </div>
 </div>
