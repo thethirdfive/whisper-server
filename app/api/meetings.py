@@ -2,6 +2,7 @@
 import shutil
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlencode
 
 import structlog
 from fastapi import (
@@ -23,7 +24,7 @@ from fastapi.responses import (
     Response,
 )
 from pydantic import BaseModel
-from sqlalchemy import desc, select
+from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.auth import require_login
@@ -89,6 +90,36 @@ def _latest_job(db: Session, meeting_id: int) -> Job | None:
     ).scalar_one_or_none()
 
 
+PAGE_SIZE = 20
+
+
+def _date_bound(raw: str, end: bool = False) -> datetime | None:
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        d = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if end and len(raw) <= 10:  # 仅日期 → 当天末尾
+        d = d.replace(hour=23, minute=59, second=59)
+    return d
+
+
+def _meeting_filter_conds(scenario_id: str, company: str, date_from: str, date_to: str) -> list:
+    conds = []
+    if (scenario_id or "").strip().isdigit():
+        conds.append(Meeting.scenario_id == int(scenario_id))
+    if (company or "").strip():
+        conds.append(Meeting.company == company.strip())
+    df, dt = _date_bound(date_from), _date_bound(date_to, end=True)
+    if df:
+        conds.append(Meeting.held_at >= df)
+    if dt:
+        conds.append(Meeting.held_at <= dt)
+    return conds
+
+
 @router.get("", response_class=HTMLResponse)
 def list_meetings(
     request: Request,
@@ -96,12 +127,49 @@ def list_meetings(
     db: Session = Depends(get_db),
     msg: str | None = None,
     error: str | None = None,
+    scenario_id: str = "",
+    company: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    page: int = 1,
 ):
-    meetings = db.execute(select(Meeting).order_by(desc(Meeting.held_at))).scalars().all()
+    conds = _meeting_filter_conds(scenario_id, company, date_from, date_to)
+    base = select(Meeting)
+    cnt = select(func.count()).select_from(Meeting)
+    if conds:
+        base, cnt = base.where(and_(*conds)), cnt.where(and_(*conds))
+    total = db.scalar(cnt) or 0
+    pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = min(max(1, page), pages)
+    meetings = db.execute(
+        base.order_by(desc(Meeting.held_at)).limit(PAGE_SIZE).offset((page - 1) * PAGE_SIZE)
+    ).scalars().all()
+
+    scenarios = db.execute(
+        select(Scenario).order_by(Scenario.sort_order, Scenario.id)
+    ).scalars().all()
+    companies = [
+        c for (c,) in db.execute(
+            select(Meeting.company).where(Meeting.company.is_not(None)).distinct()
+            .order_by(Meeting.company)
+        ).all()
+    ]
+    qs = urlencode({
+        k: v for k, v in {
+            "scenario_id": scenario_id, "company": company,
+            "date_from": date_from, "date_to": date_to,
+        }.items() if v
+    })
     return templates.TemplateResponse(
         request,
         "meetings/list.html",
-        {"user": user, "meetings": meetings, "msg": msg, "error": error},
+        {
+            "user": user, "meetings": meetings, "msg": msg, "error": error,
+            "scenarios": scenarios, "companies": companies,
+            "f": {"scenario_id": scenario_id, "company": company,
+                  "date_from": date_from, "date_to": date_to},
+            "page": page, "pages": pages, "total": total, "qs": qs,
+        },
     )
 
 
@@ -570,6 +638,7 @@ def view_report(
     meeting_id: int,
     deliverable_id: int,
     download: int = 0,
+    pdf: int = 0,
     user: User = Depends(require_login),
     db: Session = Depends(get_db),
 ):
@@ -578,11 +647,39 @@ def view_report(
         raise HTTPException(status_code=404, detail="报告不存在")
     if not Path(d.file_path).exists():
         raise HTTPException(status_code=404, detail="报告文件丢失")
+    if pdf:
+        # 打开后自动唤起浏览器打印对话框 → 另存为 PDF（零依赖、中文字体由浏览器渲染）
+        html = Path(d.file_path).read_text(encoding="utf-8", errors="replace")
+        inject = ("<script>window.addEventListener('load',function(){"
+                  "setTimeout(function(){window.print();},400);});</script>")
+        html = html.replace("</body>", inject + "</body>", 1) if "</body>" in html else html + inject
+        return HTMLResponse(html)
     fname = f"report_{meeting_id}_{deliverable_id}.html"
     return FileResponse(
         d.file_path,
         media_type="text/html",
         filename=fname if download else None,
+    )
+
+
+@router.get("/{meeting_id}/transcript.txt")
+def download_transcript(
+    meeting_id: int,
+    user: User = Depends(require_login),
+    db: Session = Depends(get_db),
+):
+    meeting = db.get(Meeting, meeting_id)
+    if not meeting:
+        raise HTTPException(status_code=404, detail="会议不存在")
+    held = meeting.held_at.strftime("%Y-%m-%d %H:%M") if meeting.held_at else ""
+    head = (f"{meeting.title}\n{held}"
+            f"{(' · ' + meeting.company) if meeting.company else ''}\n"
+            f"{'=' * 40}\n\n")
+    body = reports_svc.transcript_text(db, meeting) or "（无转录内容）"
+    return Response(
+        content=head + body,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="transcript_{meeting_id}.txt"'},
     )
 
 

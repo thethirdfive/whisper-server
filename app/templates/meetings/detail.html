@@ -60,12 +60,18 @@
 
     <!-- 转录文本 -->
     <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-        <h2 class="font-semibold mb-3">转录 / Transcript</h2>
+        <div class="flex items-center justify-between mb-3">
+            <h2 class="font-semibold">转录 / Transcript</h2>
+            {% if segments %}
+            <a href="/meetings/{{ meeting.id }}/transcript.txt"
+               class="text-xs border border-slate-200 rounded-md px-3 py-1.5 hover:bg-slate-50">⬇ 导出 TXT</a>
+            {% endif %}
+        </div>
         {% if segments %}
         <div class="space-y-3">
             {% for s in segments %}
             {% set sp = speakers.get(s.speaker_id) %}
-            <div class="flex gap-3 text-sm">
+            <div id="seg-{{ s.id }}" class="seg flex gap-3 text-sm rounded-md -mx-2 px-2 py-0.5">
                 <span class="text-xs text-slate-400 font-mono whitespace-nowrap pt-0.5">{{ mmss(s.start_sec) }}</span>
                 <div>
                     {% if sp %}<span class="font-medium text-slate-700">{{ sp.display_name or sp.label }}</span>{% endif %}
@@ -113,7 +119,10 @@
                     <span class="text-xs text-slate-400 ml-2">{{ r.created_by }} · {{ r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "" }}</span>
                     {% if r.note %}<p class="text-xs text-slate-500 mt-0.5">{{ r.note }}</p>{% endif %}
                 </div>
-                <a href="/meetings/{{ meeting.id }}/report/{{ r.id }}?download=1" class="text-xs text-slate-400 hover:text-slate-700">下载</a>
+                <div class="flex items-center gap-3 whitespace-nowrap">
+                    <a href="/meetings/{{ meeting.id }}/report/{{ r.id }}?pdf=1" target="_blank" class="text-xs text-blue-600 hover:underline">导出 PDF</a>
+                    <a href="/meetings/{{ meeting.id }}/report/{{ r.id }}?download=1" class="text-xs text-slate-400 hover:text-slate-700">下载 HTML</a>
+                </div>
             </li>
             {% endfor %}
         </ul>

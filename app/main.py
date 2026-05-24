@@ -22,7 +22,7 @@ from app.auth import (
 )
 from app.config import get_settings
 from app.database import engine, get_db
-from app.models import Scenario, User, Vocabulary, VocabularyTerm
+from app.models import AudioFile, Meeting, Scenario, Segment, User, Vocabulary, VocabularyTerm
 from app.templating import templates
 
 # ============================================================================
@@ -98,10 +98,27 @@ def root(
     if not user:
         return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
 
-    # 简单 dashboard：场景数 / 词库数 / 词条数
+    # dashboard 统计
     scenario_count = db.scalar(select(func.count()).select_from(Scenario))
     vocab_count = db.scalar(select(func.count()).select_from(Vocabulary))
     term_count = db.scalar(select(func.count()).select_from(VocabularyTerm))
+
+    meeting_count = db.scalar(select(func.count()).select_from(Meeting)) or 0
+    transcribed_count = db.scalar(
+        select(func.count()).select_from(Meeting).where(Meeting.status == "transcribed")
+    ) or 0
+    file_count = db.scalar(select(func.count()).select_from(AudioFile)) or 0
+    char_count = db.scalar(select(func.coalesce(func.sum(func.length(Segment.text)), 0))) or 0
+    duration_sec = db.scalar(
+        select(func.coalesce(func.sum(Meeting.duration_sec), 0))
+    ) or 0
+
+    secs = int(duration_sec)
+    if secs >= 3600:
+        duration_human = f"{secs // 3600}h {secs % 3600 // 60}m"
+    else:
+        duration_human = f"{secs // 60}m {secs % 60}s"
+    chars_human = f"{char_count / 10000:.1f} 万" if char_count >= 10000 else str(char_count)
 
     return templates.TemplateResponse(
         request,
@@ -112,6 +129,11 @@ def root(
             "scenario_count": scenario_count,
             "vocab_count": vocab_count,
             "term_count": term_count,
+            "meeting_count": meeting_count,
+            "transcribed_count": transcribed_count,
+            "file_count": file_count,
+            "chars_human": chars_human,
+            "duration_human": duration_human,
         },
     )
 

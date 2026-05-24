@@ -27,7 +27,31 @@
         </div>
     </div>
 
-    <!-- 统计卡 -->
+    <!-- 语料总览 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="text-2xl">🎙</div>
+            <div class="text-3xl font-bold mt-2 text-gradient inline-block">{{ meeting_count }}</div>
+            <div class="text-sm text-slate-500">会议总数 {% if transcribed_count < meeting_count %}<span class="text-slate-400">（{{ transcribed_count }} 已转录）</span>{% endif %}</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="text-2xl">📝</div>
+            <div class="text-3xl font-bold mt-2 text-gradient inline-block">{{ chars_human }}</div>
+            <div class="text-sm text-slate-500">转录字数</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="text-2xl">⏱</div>
+            <div class="text-3xl font-bold mt-2 text-gradient inline-block">{{ duration_human }}</div>
+            <div class="text-sm text-slate-500">处理音频时长</div>
+        </div>
+        <div class="bg-white rounded-xl border border-slate-200 p-6">
+            <div class="text-2xl">📁</div>
+            <div class="text-3xl font-bold mt-2 text-gradient inline-block">{{ file_count }}</div>
+            <div class="text-sm text-slate-500">音视频文件</div>
+        </div>
+    </div>
+
+    <!-- 资源 -->
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div class="bg-white rounded-xl border border-slate-200 p-6">
             <div class="text-2xl">🏷</div>

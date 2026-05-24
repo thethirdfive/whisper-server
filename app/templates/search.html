@@ -8,12 +8,42 @@
         <p class="text-sm text-slate-500 mt-1">搜索所有会议的转录正文、标题、公司、标签（中英文均可）。</p>
     </div>
 
-    <form method="get" action="/search" class="flex gap-2">
-        <input name="q" value="{{ q }}" autofocus autocomplete="off"
-               placeholder="输入关键词，如「报价」「土耳其展会」「下一步」…"
-               class="flex-1 px-4 py-2.5 border border-slate-300 rounded-md text-sm
-                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
-        <button class="bg-blue-600 text-white text-sm font-medium px-6 py-2 rounded-md">搜索</button>
+    <form method="get" action="/search" class="space-y-3">
+        <div class="flex gap-2">
+            <input name="q" value="{{ q }}" autofocus autocomplete="off"
+                   placeholder="输入关键词，如「报价」「土耳其展会」「下一步」…"
+                   class="flex-1 px-4 py-2.5 border border-slate-300 rounded-md text-sm
+                          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500" />
+            <button class="bg-blue-600 text-white text-sm font-medium px-6 py-2 rounded-md">搜索</button>
+        </div>
+        <div class="flex flex-wrap items-end gap-3 text-sm">
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">场景</label>
+                <select name="scenario_id" class="px-2.5 py-1.5 border border-slate-300 rounded-md bg-white">
+                    <option value="">全部场景</option>
+                    {% for s in scenarios %}
+                    <option value="{{ s.id }}" {% if f.scenario_id == s.id|string %}selected{% endif %}>{{ s.name_zh }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">公司</label>
+                <select name="company" class="px-2.5 py-1.5 border border-slate-300 rounded-md bg-white max-w-[12rem]">
+                    <option value="">全部公司</option>
+                    {% for c in companies %}
+                    <option value="{{ c }}" {% if f.company == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">从</label>
+                <input type="date" name="date_from" value="{{ f.date_from }}" class="px-2.5 py-1.5 border border-slate-300 rounded-md" />
+            </div>
+            <div>
+                <label class="block text-xs text-slate-400 mb-1">到</label>
+                <input type="date" name="date_to" value="{{ f.date_to }}" class="px-2.5 py-1.5 border border-slate-300 rounded-md" />
+            </div>
+        </div>
     </form>
 
     {% if q %}
@@ -40,9 +70,12 @@
             {% if g.hits %}
             <ul class="mt-2.5 space-y-1.5">
                 {% for h in g.hits %}
-                <li class="text-sm text-slate-600 flex gap-2.5">
-                    <span class="text-xs text-slate-400 font-mono pt-0.5 whitespace-nowrap">{{ "%02d:%02d"|format((h.start_sec|int)//60, (h.start_sec|int)%60) }}</span>
-                    <span class="leading-relaxed">{{ h.snippet|safe }}</span>
+                <li>
+                    <a href="/meetings/{{ g.meeting.id }}#seg-{{ h.seg_id }}"
+                       class="text-sm text-slate-600 flex gap-2.5 rounded-md -mx-2 px-2 py-1 hover:bg-slate-50 group">
+                        <span class="text-xs text-blue-600 font-mono pt-0.5 whitespace-nowrap group-hover:underline">{{ "%02d:%02d"|format((h.start_sec|int)//60, (h.start_sec|int)%60) }}</span>
+                        <span class="leading-relaxed">{{ h.snippet|safe }}</span>
+                    </a>
                 </li>
                 {% endfor %}
                 {% if g.n > g.hits|length %}

@@ -127,6 +127,10 @@ pre { background: var(--surface-2) !important; color: #b9c7e0 !important; border
 /* ---- 搜索高亮 ---- */
 mark { background: rgba(34, 211, 238, 0.24); color: #a5f3fc; border-radius: 2px; padding: 0 2px; }
 
+/* ---- 转录段落：搜索跳转后高亮目标段 ---- */
+.seg { transition: background 0.4s; scroll-margin-top: 80px; }
+.seg:target { background: rgba(34, 211, 238, 0.14); box-shadow: inset 3px 0 0 #22d3ee; }
+
 /* ---- 渐变文字 / 发光（科技点缀） ---- */
 .text-gradient {
   background: var(--grad-bright);
