@@ -3,7 +3,8 @@ import logging as _logging
 import shutil
 from datetime import datetime
 from pathlib import Path
-from urllib.parse import urlencode
+from urllib.parse import quote, urlencode
+from zoneinfo import ZoneInfo
 
 import structlog
 from fastapi import (
@@ -29,6 +30,7 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.orm import Session
 
 from app.auth import require_login
+from app.config import get_settings
 from app.database import SessionLocal, get_db
 from app.models import AudioFile, Deliverable, Job, Meeting, Scenario, Segment, Speaker, User
 from app.services import gdrive as gdrive_svc
@@ -652,6 +654,34 @@ def queue_report_route(
     return _redirect(f"/meetings/{meeting_id}?msg=已加入整理队列，整理器会按时生成报告")
 
 
+def _report_export_name(meeting: Meeting, ext: str) -> str:
+    """报告导出文件名：会议名称_描述信息_会议日期_导出时间戳.ext
+
+    - 会议名称：meeting.title
+    - 描述信息：公司名（无则取场景名）
+    - 会议日期：召开日 held_at（YYYYMMDD）
+    - 导出时间戳：导出当下（按 app 时区，YYYYMMDD-HHMMSS）
+    中文保留，其余不安全字符由 storage.safe_filename 归一为下划线。
+    """
+    held = meeting.held_at.strftime("%Y%m%d") if meeting.held_at else "nodate"
+    desc = meeting.company or (meeting.scenario.name_zh if meeting.scenario else None)
+    try:
+        now = datetime.now(ZoneInfo(get_settings().app_timezone))
+    except Exception:  # noqa: BLE001  时区名异常则退回 UTC
+        now = datetime.utcnow()
+    parts = [meeting.title or f"meeting{meeting.id}", desc, held, f"导出{now.strftime('%Y%m%d-%H%M%S')}"]
+    # 先把路径分隔符替换掉：safe_filename 内部走 Path(...).name，标题含 "/" 会被当目录截断
+    raw = "_".join(p for p in parts if p).replace("/", "_").replace("\\", "_")
+    stem = storage.safe_filename(raw)
+    return f"{stem}.{ext}"
+
+
+def _attachment_cd(filename: str) -> str:
+    """支持中文的 Content-Disposition：RFC 5987 filename* + ascii 回退。"""
+    ascii_fb = filename.encode("ascii", "ignore").decode().strip("_") or "report"
+    return f"attachment; filename=\"{ascii_fb}\"; filename*=UTF-8''{quote(filename)}"
+
+
 @router.get("/{meeting_id}/report/{deliverable_id}", response_class=HTMLResponse)
 def view_report(
     meeting_id: int,
@@ -673,11 +703,11 @@ def view_report(
                   "setTimeout(function(){window.print();},400);});</script>")
         html = html.replace("</body>", inject + "</body>", 1) if "</body>" in html else html + inject
         return HTMLResponse(html)
-    fname = f"report_{meeting_id}_{deliverable_id}.html"
+    fname = _report_export_name(d.meeting, "html") if download else None
     return FileResponse(
         d.file_path,
         media_type="text/html",
-        filename=fname if download else None,
+        filename=fname,
     )
 
 
@@ -713,7 +743,7 @@ def report_pdf(
     return Response(
         content=pdf,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="report_{meeting_id}_{deliverable_id}.pdf"'},
+        headers={"Content-Disposition": _attachment_cd(_report_export_name(d.meeting, "pdf"))},
     )
 
 

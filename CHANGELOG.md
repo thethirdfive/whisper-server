@@ -7,6 +7,15 @@
 
 ---
 
+## [0.1.2] - 2026-06-20
+
+### 优化
+- **报告导出文件名改为可读格式**：HTML 下载与 PDF 导出的文件名由原来的 `report_{id}_{id}` 改为
+  **`会议名称_描述信息_会议日期_导出时间戳`**（描述信息取公司名，无则取场景名；导出时间戳按 app 时区）。
+  中文文件名经 RFC 5987（`filename*`）正确编码，并带 ascii 回退；标题含 `/` 不再被截断。
+
+---
+
 ## [0.1.1] - 2026-06-20
 
 让「转录后整理」从手动跑变成**可定时、可自定义、可观测**：cron 拉起 headless Claude Code 自动整理，
@@ -67,6 +76,7 @@
   `BACKUP_CRON_SCHEDULE` 未加引号致 `source .env` 报错；RQ 2.x 移除 `Connection`；Starlette 新版 `TemplateResponse` 签名。
 - MCP server 改为在 app 容器内运行（解决本机进程写 SQLite 的 `readonly database`）；强制日志走 stderr，避免污染 stdio JSON-RPC。
 
-[未发布 / Unreleased]: https://github.com/thethirdfive/whisper-server/compare/v0.1.1...dev
+[未发布 / Unreleased]: https://github.com/thethirdfive/whisper-server/compare/v0.1.2...dev
+[0.1.2]: https://github.com/thethirdfive/whisper-server/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/thethirdfive/whisper-server/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/thethirdfive/whisper-server/releases/tag/v0.1.0

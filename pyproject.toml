@@ -1,6 +1,6 @@
 [project]
 name = "whisper-server"
-version = "0.1.1"
+version = "0.1.2"
 description = "Private meeting transcription system with scenario-aware vocabulary and MCP integration"
 authors = [{ name = "Ethan", email = "asecondfive@gmail.com" }]
 requires-python = ">=3.11,<3.13"
