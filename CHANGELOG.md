@@ -5,6 +5,25 @@
 
 ## [未发布 / Unreleased]
 
+---
+
+## [0.1.1] - 2026-06-20
+
+让「转录后整理」从手动跑变成**可定时、可自定义、可观测**：cron 拉起 headless Claude Code 自动整理，
+每场会议可自定义整理要求/上下文，设置页能看到调度状态、详情页能看到报告生成时间。
+
+### 新增 — 定时整理与自定义
+- **每场会议自定义「报告整理要求 / 上下文」**（migration 005，`meetings.report_context`）：详情页报告区可编辑，
+  生成时把**场景设定 + 该要求 + 转录全文**一并喂给整理器。`reports.meeting_context()` 统一打包上下文，
+  MCP `get_meeting` 返回 `scenario_description / report_context / custom_prompt / tags`，整理 prompt 要求报告
+  显式体现「场景设定」「备注/特殊强调」。
+- **系统 cron 定时整理**（`scripts/install-organizer-cron.sh` + `scripts/organize-reports.sh`）：每天 02:00
+  （Asia/Shanghai）由系统 cron 拉起 **headless Claude Code**（`claude -p` 经 whisper MCP）整理待办报告——
+  **不需要常驻 tmux，服务器重启自动恢复**，走 Claude Max 订阅零额外费用。
+- **调度可观测**：整理脚本每次把「计划 / 上次运行时间 / 结果」写回 settings 表
+  （`app/services/scheduler_status.py` + `scripts/record_organizer_run.py`），设置页新增「定时整理 / Scheduler」卡片展示；
+  详情页报告条目显示**生成执行时间**（`生成于 YYYY-MM-DD HH:MM:SS`）。
+
 ### 优化
 - 会议详情页：把「整理报告」区块上移到转录文本之上，生成/查看/导出 PDF/下载 HTML 等操作无需下滑即可点到。
 
@@ -48,5 +67,6 @@
   `BACKUP_CRON_SCHEDULE` 未加引号致 `source .env` 报错；RQ 2.x 移除 `Connection`；Starlette 新版 `TemplateResponse` 签名。
 - MCP server 改为在 app 容器内运行（解决本机进程写 SQLite 的 `readonly database`）；强制日志走 stderr，避免污染 stdio JSON-RPC。
 
-[未发布 / Unreleased]: https://github.com/thethirdfive/whisper-server/compare/main...dev
+[未发布 / Unreleased]: https://github.com/thethirdfive/whisper-server/compare/v0.1.1...dev
+[0.1.1]: https://github.com/thethirdfive/whisper-server/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/thethirdfive/whisper-server/releases/tag/v0.1.0

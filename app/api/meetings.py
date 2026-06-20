@@ -623,6 +623,20 @@ def create_from_drive(
 # ===========================================================================
 # 转录后整理：入队 + 查看 HTML 报告
 # ===========================================================================
+@router.post("/{meeting_id}/report-context")
+def save_report_context(
+    meeting_id: int,
+    user: User = Depends(require_login),
+    db: Session = Depends(get_db),
+    report_context: str = Form(""),
+):
+    """保存本场会议自定义的「报告整理要求 / 上下文」。"""
+    meeting = _owned_meeting(db, meeting_id, user)
+    meeting.report_context = report_context.strip() or None
+    db.commit()
+    return _redirect(f"/meetings/{meeting_id}?msg=已保存报告整理要求")
+
+
 @router.post("/{meeting_id}/report/queue")
 def queue_report_route(
     meeting_id: int,

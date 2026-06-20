@@ -24,6 +24,31 @@
         </dl>
     </div>
 
+    <!-- 定时整理（Scheduler）状态 -->
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <h2 class="font-semibold mb-4">定时整理 / Scheduler
+            {% if scheduler.configured %}
+            <span class="ml-2 text-xs px-2 py-0.5 rounded bg-green-50 text-green-700">已启用</span>
+            {% else %}
+            <span class="ml-2 text-xs px-2 py-0.5 rounded bg-slate-100 text-slate-500">未配置</span>
+            {% endif %}
+        </h2>
+        {% if scheduler.configured %}
+        {% set st_color = {"ok":"text-green-600","running":"text-blue-600","failed":"text-red-600"} %}
+        <dl class="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3 text-sm">
+            <div><dt class="text-slate-400">计划</dt><dd class="font-mono">{{ scheduler.schedule }}</dd></div>
+            <div><dt class="text-slate-400">上次运行</dt><dd class="font-mono">{{ scheduler.last_run_at or "—" }}</dd></div>
+            <div><dt class="text-slate-400">结果</dt><dd class="font-mono {{ st_color.get(scheduler.last_status, 'text-slate-500') }}">{{ scheduler.last_status or "—" }}</dd></div>
+            <div class="col-span-2 md:col-span-3"><dt class="text-slate-400">说明</dt><dd>{{ scheduler.last_summary or "—" }}</dd></div>
+        </dl>
+        <p class="text-xs text-slate-400 mt-3">由宿主机 cron 在计划时间拉起 headless Claude Code（走 MCP，零额外费用），无需常驻 tmux、重启自动恢复。</p>
+        {% else %}
+        <p class="text-sm text-slate-500">尚未配置定时整理。在宿主机仓库目录执行
+            <code class="font-mono bg-slate-100 px-1 rounded">bash scripts/install-organizer-cron.sh</code>
+            即可每天 02:00（Asia/Shanghai）自动整理待办报告。详见 README「让 Claude Code 定期整理」。</p>
+        {% endif %}
+    </div>
+
     <!-- 数据统计 -->
     <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
         <h2 class="font-semibold mb-4">数据 / Data</h2>

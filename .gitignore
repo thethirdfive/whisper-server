@@ -80,3 +80,6 @@ logs/
 .coverage
 htmlcov/
 test_results/
+
+# 定时整理运行日志（host 侧 cron 生成）
+.organizer-logs/
