@@ -13,7 +13,7 @@
 每场会议可自定义整理要求/上下文，设置页能看到调度状态、详情页能看到报告生成时间。
 
 ### 新增 — 定时整理与自定义
-- **每场会议自定义「报告整理要求 / 上下文」**（migration 005，`meetings.report_context`）：详情页报告区可编辑，
+- **每场会议自定义「报告整理要求 / 上下文」**（migration 007，`meetings.report_context`）：详情页报告区可编辑，
   生成时把**场景设定 + 该要求 + 转录全文**一并喂给整理器。`reports.meeting_context()` 统一打包上下文，
   MCP `get_meeting` 返回 `scenario_description / report_context / custom_prompt / tags`，整理 prompt 要求报告
   显式体现「场景设定」「备注/特殊强调」。
