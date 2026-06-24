@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.auth import require_login
 from app.database import get_db
 from app.models import Meeting, Scenario, User, Vocabulary, VocabularyTerm
-from app.services import settings_store
+from app.services import scheduler_status, settings_store
 from app.templating import templates
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -43,6 +43,7 @@ def settings_page(
             "values": settings_store.effective_all(db),
             "overridden": settings_store.overridden_keys(db),
             "sensitive": settings_store.sensitive_display(),
+            "scheduler": scheduler_status.status(db),
             "stats": _stats(db),
             "saved": saved,
             "error": error,

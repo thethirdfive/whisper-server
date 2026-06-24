@@ -75,8 +75,28 @@
             {% endif %}
         </div>
 
+        <!-- 报告整理要求 / 上下文（自定义，喂给整理器） -->
+        <details class="mb-3 border border-slate-200 rounded-md" {% if meeting.report_context %}open{% endif %}>
+            <summary class="cursor-pointer select-none px-3 py-2 text-sm text-slate-700 bg-slate-50 rounded-md">
+                ✏️ 报告整理要求 / 上下文
+                {% if meeting.report_context %}<span class="text-xs text-green-600 ml-1">已设置</span>{% else %}<span class="text-xs text-slate-400 ml-1">（可选，留空则按场景模板）</span>{% endif %}
+            </summary>
+            <form method="post" action="/meetings/{{ meeting.id }}/report-context" class="p-3">
+                <p class="text-xs text-slate-400 mb-2">
+                    写明这场会议报告该怎么整理：要求、备注、特点、背景上下文。生成报告时会把
+                    <b>场景设定 + 本要求 + 转录全文</b>一起喂给 Claude Code。改完记得「生成报告」。
+                </p>
+                <textarea name="report_context" rows="5"
+                    class="w-full text-sm border border-slate-200 rounded-md p-2 focus:ring-1 focus:ring-blue-500"
+                    placeholder="例：本场是日本保健品京东店铺经营讨论。重点提炼 SKU 策略、价格与利润、竞品、合规要点；输出决策事项与待办（含负责人）。河南方言转录可能有错字，请按上下文纠正专有名词。">{{ meeting.report_context or "" }}</textarea>
+                <div class="mt-2 flex justify-end">
+                    <button class="bg-slate-700 hover:bg-slate-800 text-white text-sm px-4 py-1.5 rounded-md">保存要求</button>
+                </div>
+            </form>
+        </details>
+
         {% if meeting.report_status in ["queued", "processing"] %}
-        <p class="text-sm text-slate-400">已加入整理队列，整理器（Claude Code）会按时生成 HTML 报告，完成后 Bark 通知你。</p>
+        <p class="text-sm text-slate-400">已加入整理队列，整理器（Claude Code 定时整理）会生成 HTML 报告，完成后 Bark 通知你。</p>
         {% endif %}
 
         {% if reports %}
@@ -85,7 +105,7 @@
             <li class="py-2 flex items-center justify-between">
                 <div>
                     <a href="/meetings/{{ meeting.id }}/report/{{ r.id }}" target="_blank" class="text-blue-600 hover:underline font-medium">查看报告 #{{ r.id }}</a>
-                    <span class="text-xs text-slate-400 ml-2">{{ r.created_by }} · {{ r.created_at.strftime("%Y-%m-%d %H:%M") if r.created_at else "" }}</span>
+                    <span class="text-xs text-slate-400 ml-2">{{ r.created_by }} · 生成于 {{ r.created_at.strftime("%Y-%m-%d %H:%M:%S") if r.created_at else "—" }}</span>
                     {% if r.note %}<p class="text-xs text-slate-500 mt-0.5">{{ r.note }}</p>{% endif %}
                 </div>
                 <div class="flex items-center gap-3 whitespace-nowrap">

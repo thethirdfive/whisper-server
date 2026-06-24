@@ -25,7 +25,10 @@ DEFAULT_TEMPLATE = """\
 
 要求：
 - 输出**完整的 HTML 文档**（含 <html><head><style>…</style></head><body>…），内联 CSS，可直接在浏览器打开；中文，排版美观、专业。
-- 建议包含：会议概要 / 关键议题与结论 / 决策事项 / 待办行动项（负责人·截止时间，如有）/ 风险与跟进 / 按主题或说话人的要点。
+- 顶部先给出两块（若对应信息存在）：
+  · **场景设定**：依据本会议所属场景（scenario_description）说明这类会议的背景与侧重；
+  · **备注 / 特殊强调**：把自定义整理要求（report_context）与备注标签（tags）里强调的点单列出来，并在正文中据此取舍详略。
+- 主体建议包含：会议概要 / 关键议题与结论 / 决策事项 / 待办行动项（负责人·截止时间，如有）/ 风险与跟进 / 按主题或说话人的要点。
 - 善用标题层级、表格、列表、要点高亮、必要时用简单图示，**体现要点之间的关联**。
 - 忠于原文、不杜撰；信息不足处标注“未提及”。
 - 只输出 HTML 本身，不要额外解释或代码块围栏。"""
@@ -61,6 +64,33 @@ def transcript_text(db: Session, meeting: Meeting) -> str:
         prefix = f"[{mm:02d}:{ss:02d}]" + (f" {who}: " if who else " ")
         lines.append(prefix + (s.text or "").strip())
     return "\n".join(lines)
+
+
+def meeting_context(db: Session, meeting: Meeting) -> dict:
+    """整理器要用到的「全部上下文」结构化打包。
+
+    供 MCP get_meeting（Claude Code 整理）与将来的 LLM API worker 复用，确保两条
+    整理路径喂进去的上下文一致：场景设定 + 自定义整理要求 + 备注 + 转录全文。
+    """
+    sc = meeting.scenario
+    return {
+        "title": meeting.title,
+        "company": meeting.company,
+        "tags": meeting.tags,
+        "held_at": meeting.held_at.isoformat() if meeting.held_at else None,
+        "language": meeting.language,
+        "duration_sec": meeting.duration_sec,
+        # 场景设定：场景名 + 场景描述（描述即「这类会议的背景/侧重」）
+        "scenario": sc.name_zh if sc else None,
+        "scenario_description": (sc.description_zh if sc else None),
+        # 用户在详情页自定义的「本场报告整理要求 / 备注 / 特点 / 上下文」
+        "report_context": meeting.report_context,
+        # 转录用的提示词（可能含本场专有名词，对整理也有参考价值）
+        "custom_prompt": meeting.custom_prompt,
+        # 该场景的整理模板（场景级 → 全局 → 内置默认）
+        "template_instructions": get_template(db, meeting.scenario_id),
+        "transcript": transcript_text(db, meeting),
+    }
 
 
 def queue_report(db: Session, meeting: Meeting) -> None:

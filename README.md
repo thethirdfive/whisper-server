@@ -166,18 +166,23 @@ open http://localhost:18080
 1. **上传** — 「会议 / Meetings」→「新建」：选场景、说话人分离模式、可选自定义 prompt → 拖入文件或用 Google Drive 选择 → 后台上传（右下角托盘看进度）。
 2. **转录** — 上传完成自动入队；详情页 htmx 轮询状态，完成后展示转录（含时间戳、说话人），可「导出 TXT」。
 3. **检索** — 顶栏搜索框做全文搜索；命中片段点开跳转到对应会议的该段并高亮；列表/搜索均可按场景/公司/时间筛选。
-4. **生成报告** — 详情页「整理报告」区点「生成报告」→ 进待整理队列；待 Claude Code 整理后，可在该区查看 / 导出 PDF / 下载 HTML，并收到 Bark 通知。**前提是已按下节配好 Claude Code 定时整理。**
-5. **维护** — 见 [常用命令](#常用命令)；DB 每日自动备份到 HDD。
+4. **（可选）写整理要求** — 详情页「整理报告」区展开「✏️ 报告整理要求 / 上下文」，写明本场报告的要求/备注/特点/背景；留空则只按场景模板。
+5. **生成报告** — 同区点「生成报告」→ 进待整理队列；下一个整理周期（默认每天 02:00）由 Claude Code 整理后，可在该区查看 / 导出 PDF / 下载 HTML（条目显示生成时间），并收到 Bark 通知。**前提是已按下节装好定时整理 cron。**
+6. **维护** — 见 [常用命令](#常用命令)；DB 每日自动备份到 HDD。
 
-### C. 让 Claude Code 定期整理（一次性配置）
+### C. 让 Claude Code 定期整理（一次性配置，推荐 cron + headless）
 
 ```bash
-cd /home/ai/whisper-server && claude     # 仓库根已有 .mcp.json，首次提示批准 MCP server `whisper`
-# 在 Claude Code 里 /mcp 应看到 whisper 已连接、5 个工具可用
-# 用 /schedule（推荐，cron）或 /loop 30m 定期跑 docs/organize-prompt.md 的整理 prompt
+cd /home/ai/whisper-server
+claude          # 仓库根已有 .mcp.json，首次交互式启动一次以批准 MCP server `whisper`（之后 headless 复用授权）
+bash scripts/install-organizer-cron.sh   # 装系统 cron：每天 02:00 (Asia/Shanghai) 跑一次
+bash scripts/organize-reports.sh         # 可立刻手动跑一次验证（日志在 .organizer-logs/）
 ```
 
-完整说明见 [docs/organize-with-claude-code.md](docs/organize-with-claude-code.md)。
+cron 在计划时间用 **headless Claude Code**（`claude -p` 经 whisper MCP）整理待办报告，干完即退出：
+**不依赖常驻 tmux/会话，系统 cron 开机自启 → 服务器重启自动恢复**，走 Claude Max 订阅、零额外费用。
+调度状态（计划 / 上次运行 / 结果）在「设置 → 定时整理」可见。完整说明见
+[docs/organize-with-claude-code.md](docs/organize-with-claude-code.md)。
 
 ---
 
@@ -185,16 +190,17 @@ cd /home/ai/whisper-server && claude     # 仓库根已有 .mcp.json，首次提
 
 **当前是「半自动」**，分清两步：
 
-- **入队（手动）**：每场会议需要你在详情页点「生成报告」，把它放进待整理队列（`report_status=queued`）。
-- **生成（依赖 Claude Code）**：真正把转录整理成 HTML 的是你机器上的 **Claude Code 经 MCP**。它**不是常驻服务**——需要你用 `/schedule`（cron）或 `/loop` 让它定期跑整理 prompt（或手动跑一次）。**没有 Claude Code 在跑，队列里的报告不会自动生成。**
-- 一旦配好 `/schedule`，体验上接近「自动」：点完「生成报告」，下个调度周期就生成并 Bark 通知。走 Claude Max 订阅，几乎零额外 API 费用。
+- **入队（手动）**：每场会议需要你在详情页点「生成报告」，把它放进待整理队列（`report_status=queued`）；可选先填本场「报告整理要求 / 上下文」。
+- **生成（cron + headless Claude Code）**：真正把转录整理成 HTML 的是你机器上的 **Claude Code 经 MCP**。它**不是常驻服务**——由**系统 cron** 在计划时间（默认每天 02:00）拉起 `claude -p` headless 跑一次整理 prompt。**装好 cron 后无需常驻 tmux，服务器重启自动恢复**；没装 cron（也没手动跑）则队列里的报告不会生成。
+- 装好 cron 后体验上接近「自动」：点完「生成报告」，下个调度周期就生成并 Bark 通知。走 Claude Max 订阅，几乎零额外 API 费用。调度状态在「设置 → 定时整理」可见。
 
 整理器的工作循环（prompt 见 `docs/organize-prompt.md`）：
 
 ```
-list_pending_reports() → 对每条 claim_report(id) → get_meeting(id)（取场景模板 + 转录全文）
-  → 按模板生成自包含 HTML → submit_report(id, html, summary) → 落盘 + deliverable + 置 done + Bark
-  （失败则 report_failed(id, error) 并继续下一条）
+list_pending_reports() → 对每条 claim_report(id) → get_meeting(id)
+  （取 场景设定 + 自定义整理要求 report_context + 备注 + 转录全文）
+  → 按模板生成自包含 HTML（体现场景设定/备注强调）→ submit_report(id, html, summary)
+  → 落盘 + deliverable + 置 done + Bark （失败则 report_failed(id, error) 并继续下一条）
 ```
 
 > **MCP server 跑在 app 容器内**（`mcp_server/server.py`，已打进 app 镜像），`.mcp.json` 用 `docker compose exec -T app python -m mcp_server.server` 以 stdio 连入。原因：SQLite 库文件由容器以 root 写入，本机用户进程直接连会报 `readonly database`；在容器内跑则库/产出目录/代理/依赖都与 app 一致。

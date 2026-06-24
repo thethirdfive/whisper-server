@@ -64,25 +64,19 @@ def list_pending_reports() -> list[dict]:
 
 @mcp.tool()
 def get_meeting(meeting_id: int) -> dict:
-    """取一场会议的元数据、该场景的整理模板、以及带说话人/时间戳的转录全文。"""
+    """取一场会议的全部整理上下文：元数据 + 场景设定（scenario_description）+
+    用户自定义整理要求（report_context）+ 备注（tags）+ 转录提示词（custom_prompt）
+    + 该场景整理模板 + 带说话人/时间戳的转录全文。
+
+    整理时务必把「场景设定」与「备注/自定义要求」体现到报告里（见模板说明）。
+    """
     db = SessionLocal()
     try:
         m = db.get(Meeting, meeting_id)
         if not m:
             return {"error": f"meeting {meeting_id} 不存在"}
-        return {
-            "meeting_id": m.id,
-            "title": m.title,
-            "scenario": m.scenario.name_zh if m.scenario else None,
-            "company": m.company,
-            "tags": m.tags,
-            "held_at": m.held_at.isoformat() if m.held_at else None,
-            "language": m.language,
-            "duration_sec": m.duration_sec,
-            "report_status": m.report_status,
-            "template_instructions": reports_svc.get_template(db, m.scenario_id),
-            "transcript": reports_svc.transcript_text(db, m),
-        }
+        ctx = reports_svc.meeting_context(db, m)
+        return {"meeting_id": m.id, "report_status": m.report_status, **ctx}
     finally:
         db.close()
 

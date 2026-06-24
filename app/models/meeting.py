@@ -37,6 +37,9 @@ class Meeting(Base):
     language: Mapped[str] = mapped_column(String(8), nullable=False, server_default="zh")
     status: Mapped[str] = mapped_column(String(32), nullable=False, server_default="uploaded")
     custom_prompt: Mapped[str | None] = mapped_column(Text)
+    # 报告整理要求/上下文：用户在详情页自定义的「这场会议报告该怎么整理」（要求/备注/特点/背景），
+    # 与转录用的 custom_prompt 分开。整理器会把它连同场景设定一起喂给 Claude Code。
+    report_context: Mapped[str | None] = mapped_column(Text)
     # 整理报告状态：none=未生成 | queued=待整理 | processing=整理中 | done=已生成 | failed
     report_status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="none")
     # 说话人分离：off=不分离 | auto=pyannote 自动估人数 | count=pyannote 指定人数 | channels=按声道拆分
